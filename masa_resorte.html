@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movimiento Armónico Simple — Sistema masa–resorte</title>
+<style>
+  :root{
+    --bg:#f8fbff;
+    --panel:#ffffff;
+    --text:#0f172a;
+    --muted:#52637a;
+    --border:#cbd5e1;
+    --spring:#1f2937;
+    --cart:#f1f5f9;
+    --velocity:#0284c7;
+    --accel:#dc2626;
+    --force:#7c3aed;
+    --disp:#059669;
+    --accent:#334155;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    padding:10px;
+    font-family:Arial,Helvetica,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  .wrap{
+    width:min(1180px,100%);
+    margin:0 auto;
+  }
+
+  .top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:8px;
+  }
+
+  .heading{
+    min-width:0;
+  }
+
+  h1{
+    margin:0;
+    font-size:clamp(22px,2.5vw,32px);
+    line-height:1.05;
+  }
+
+  .concept{
+    margin-top:5px;
+    color:var(--muted);
+    font-size:15px;
+    line-height:1.35;
+  }
+
+  .sim{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:10px;
+    box-shadow:0 6px 18px rgba(15,23,42,.04);
+  }
+
+  .vector-panel{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px 14px;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:11px;
+    background:#f7fbff;
+    margin-bottom:8px;
+    font-size:14px;
+  }
+
+  .vector-panel strong{
+    margin-right:2px;
+  }
+
+  .check{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+    cursor:pointer;
+    user-select:none;
+  }
+
+  .check input{
+    width:17px;
+    height:17px;
+    cursor:pointer;
+  }
+
+  .chip{
+    display:inline-block;
+    width:18px;
+    height:5px;
+    border-radius:2px;
+  }
+
+  svg{
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:61vh;
+    min-height:330px;
+    border-radius:12px;
+    background:linear-gradient(#ffffff,#f8fbff);
+  }
+
+  .metrics{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:7px;
+    margin-top:8px;
+  }
+
+  .metric{
+    text-align:center;
+    padding:7px 6px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    background:#fbfdff;
+  }
+
+  .metric .label{
+    display:block;
+    color:var(--muted);
+    font-size:11px;
+    margin-bottom:2px;
+  }
+
+  .metric .value{
+    display:block;
+    font-weight:700;
+    font-size:16px;
+  }
+
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    gap:8px 13px;
+    margin-top:8px;
+  }
+
+  button{
+    min-height:38px;
+    padding:0 14px;
+    border:1px solid var(--border);
+    border-radius:9px;
+    background:white;
+    color:var(--text);
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  button:hover{
+    background:#f3f6fa;
+  }
+
+  .control{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+  }
+
+  .control input[type="range"]{
+    width:110px;
+  }
+
+  .status{
+    text-align:center;
+    font-weight:700;
+    margin-top:7px;
+    min-height:1.2em;
+    font-size:14px;
+  }
+
+  .table-title{
+    margin:9px 0 5px;
+    font-weight:700;
+    font-size:14px;
+    color:#334155;
+  }
+
+  .table-wrap{
+    overflow-x:auto;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:610px;
+    background:#fff;
+    border:1px solid var(--border);
+    font-size:13px;
+  }
+
+  th,td{
+    padding:7px 8px;
+    border-bottom:1px solid var(--border);
+    text-align:center;
+  }
+
+  th{
+    background:#f1f5f9;
+  }
+
+  tr:last-child td{
+    border-bottom:none;
+  }
+
+  .emph{
+    font-weight:700;
+  }
+
+  @media(max-width:760px){
+    body{padding:6px}
+    .top{display:block}
+    svg{max-height:none;min-height:300px}
+    .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .vector-panel{font-size:13px}
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="heading">
+      <h1>Movimiento Armónico Simple</h1>
+      <div class="concept">
+        Sistema masa–resorte: el cuerpo oscila alrededor del equilibrio. En los extremos la rapidez es cero y en x = 0 es máxima.
+      </div>
+    </div>
+  </div>
+
+  <div class="sim">
+
+    <div class="vector-panel">
+      <strong>Mostrar en la animación:</strong>
+
+      <label class="check">
+        <input id="showVelocity" type="checkbox" checked>
+        <span class="chip" style="background:#0284c7"></span>
+        Velocidad
+      </label>
+
+      <label class="check">
+        <input id="showAcceleration" type="checkbox" checked>
+        <span class="chip" style="background:#dc2626"></span>
+        Aceleración
+      </label>
+
+      <label class="check">
+        <input id="showForce" type="checkbox" checked>
+        <span class="chip" style="background:#7c3aed"></span>
+        Fuerza restauradora F
+      </label>
+
+      <label class="check">
+        <input id="showDisplacement" type="checkbox" checked>
+        <span class="chip" style="background:#059669"></span>
+        Desplazamiento
+      </label>
+    </div>
+
+    <svg id="scene" viewBox="0 0 1100 470" role="img"
+         aria-label="Sistema masa resorte realizando movimiento armónico simple">
+
+      <!-- pared -->
+      <rect x="70" y="115" width="28" height="205" rx="3" fill="#475569"/>
+      <g stroke="#64748b" stroke-width="3">
+        <line x1="73" y1="135" x2="95" y2="123"/>
+        <line x1="73" y1="175" x2="95" y2="163"/>
+        <line x1="73" y1="215" x2="95" y2="203"/>
+        <line x1="73" y1="255" x2="95" y2="243"/>
+        <line x1="73" y1="295" x2="95" y2="283"/>
+      </g>
+
+      <!-- riel -->
+      <line x1="55" y1="335" x2="1040" y2="335" stroke="#334155" stroke-width="6"/>
+
+      <!-- eje x -->
+      <line x1="160" y1="410" x2="995" y2="410" stroke="#64748b" stroke-width="3"/>
+      <polygon points="995,410 979,402 979,418" fill="#64748b"/>
+      <text x="1014" y="417" font-size="20" fill="#334155">x</text>
+
+      <!-- marcas -A, 0, +A -->
+      <line id="markMinus" x1="0" y1="380" x2="0" y2="430"
+            stroke="#94a3b8" stroke-width="3" stroke-dasharray="7 6"/>
+      <line id="markZero" x1="560" y1="105" x2="560" y2="430"
+            stroke="#94a3b8" stroke-width="3" stroke-dasharray="7 6"/>
+      <line id="markPlus" x1="0" y1="380" x2="0" y2="430"
+            stroke="#94a3b8" stroke-width="3" stroke-dasharray="7 6"/>
+
+      <text id="labelMinus" x="0" y="454" text-anchor="middle" font-size="24" fill="#334155">−A</text>
+      <text x="560" y="454" text-anchor="middle" font-size="24" fill="#334155">0</text>
+      <text id="labelPlus" x="0" y="454" text-anchor="middle" font-size="24" fill="#334155">+A</text>
+
+      <!-- resorte -->
+      <path id="spring" d="" fill="none" stroke="#1f2937" stroke-width="6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- carrito -->
+      <g id="cart">
+        <rect x="0" y="0" width="150" height="82" rx="12"
+              fill="#e7edf3" stroke="#334155" stroke-width="4"/>
+        <circle cx="36" cy="90" r="17" fill="#334155"/>
+        <circle cx="114" cy="90" r="17" fill="#334155"/>
+        <!-- centro de masa -->
+        <circle cx="75" cy="41" r="7.5" fill="#111827"/>
+        <circle cx="75" cy="41" r="12.5" fill="none" stroke="#94a3b8" stroke-width="2" opacity=".65"/>
+      </g>
+
+      <!-- velocidad -->
+      <g id="velocity" opacity="0">
+        <line id="vLine" x1="0" y1="0" x2="0" y2="0"
+              stroke="#0284c7" stroke-width="10" stroke-linecap="round"/>
+        <polygon id="vHead" points="0,0 0,0 0,0" fill="#0284c7"/>
+        <text id="vText" x="0" y="0" font-size="25" font-weight="700" fill="#0284c7">v</text>
+      </g>
+
+      <!-- aceleración -->
+      <g id="accel" opacity="0">
+        <line id="aLine" x1="0" y1="0" x2="0" y2="0"
+              stroke="#dc2626" stroke-width="9" stroke-linecap="round"/>
+        <polygon id="aHead" points="0,0 0,0 0,0" fill="#dc2626"/>
+        <text id="aText" x="0" y="0" font-size="25" font-weight="700" fill="#dc2626">a</text>
+      </g>
+
+      <!-- fuerza restauradora: nace exactamente en el centro de masa del carrito -->
+      <g id="force" opacity="0">
+        <line id="fLine" x1="0" y1="0" x2="0" y2="0"
+              stroke="#7c3aed" stroke-width="9" stroke-linecap="round"/>
+        <polygon id="fHead" points="0,0 0,0 0,0" fill="#7c3aed"/>
+        <text id="fText" x="0" y="0" font-size="25" font-weight="700" fill="#7c3aed">F</text>
+      </g>
+
+      <!-- desplazamiento -->
+      <g id="disp" opacity="0">
+        <line id="xLine" x1="560" y1="372" x2="560" y2="372"
+              stroke="#059669" stroke-width="8" stroke-linecap="round"/>
+        <polygon id="xHead" points="0,0 0,0 0,0" fill="#059669"/>
+        <text id="xText" x="560" y="360" font-size="23" font-weight="700"
+              fill="#059669" text-anchor="middle">x</text>
+      </g>
+
+      <text id="stateText" x="560" y="58" text-anchor="middle"
+            font-size="28" font-weight="700" fill="#0f172a">
+        Máxima compresión
+      </text>
+    </svg>
+
+    <div class="metrics">
+      <div class="metric">
+        <span class="label">Posición x</span>
+        <span class="value" id="mx">−2.00 m</span>
+      </div>
+      <div class="metric">
+        <span class="label">Velocidad v</span>
+        <span class="value" id="mv">0.00 m/s</span>
+      </div>
+      <div class="metric">
+        <span class="label">Aceleración a</span>
+        <span class="value" id="ma">0.00 m/s²</span>
+      </div>
+      <div class="metric">
+        <span class="label">Período T</span>
+        <span class="value" id="mT">—</span>
+      </div>
+      <div class="metric">
+        <span class="label">Frecuencia f</span>
+        <span class="value" id="mf">—</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="play" type="button">Pausar</button>
+      <button id="reset" type="button">Reiniciar</button>
+
+      <div class="control">
+        <label for="amp"><strong>A:</strong></label>
+        <input id="amp" type="range" min="1" max="3" value="2" step="0.1">
+        <span id="ampVal">2.0 m</span>
+      </div>
+
+      <div class="control">
+        <label for="mass"><strong>m:</strong></label>
+        <input id="mass" type="range" min="0.5" max="3" value="1" step="0.1">
+        <span id="massVal">1.0 kg</span>
+      </div>
+
+      <div class="control">
+        <label for="springK"><strong>k:</strong></label>
+        <input id="springK" type="range" min="2" max="20" value="8" step="1">
+        <span id="springKVal">8 N/m</span>
+      </div>
+    </div>
+
+    <div id="status" class="status">
+      −A · rapidez = 0 · aceleración máxima hacia el equilibrio
+    </div>
+
+    <div class="table-title">Puntos clave durante una oscilación</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Posición</th>
+            <th>Rapidez</th>
+            <th>Aceleración</th>
+            <th>Fuerza restauradora F</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>x = −A</td>
+            <td>0</td>
+            <td class="emph">Máxima, hacia el equilibrio</td>
+            <td class="emph">Máxima, hacia el equilibrio</td>
+          </tr>
+          <tr>
+            <td>x = 0</td>
+            <td class="emph">Máxima</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
+          <tr>
+            <td>x = +A</td>
+            <td>0</td>
+            <td class="emph">Máxima, hacia el equilibrio</td>
+            <td class="emph">Máxima, hacia el equilibrio</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(()=>{
+  "use strict";
+
+  const EQ=560;
+  const PX_PER_UNIT=92;
+  const WALL_X=98;
+  const SPRING_Y=280;
+  const CART_W=150;
+  const CART_H=82;
+  const CART_Y=239;
+  const CART_CENTER_LOCAL_X=75;
+  const CART_CENTER_LOCAL_Y=41;
+
+  const spring=document.getElementById("spring");
+  const cart=document.getElementById("cart");
+
+  const markMinus=document.getElementById("markMinus");
+  const markPlus=document.getElementById("markPlus");
+  const labelMinus=document.getElementById("labelMinus");
+  const labelPlus=document.getElementById("labelPlus");
+
+  const velocity=document.getElementById("velocity");
+  const vLine=document.getElementById("vLine");
+  const vHead=document.getElementById("vHead");
+  const vText=document.getElementById("vText");
+
+  const accel=document.getElementById("accel");
+  const aLine=document.getElementById("aLine");
+  const aHead=document.getElementById("aHead");
+  const aText=document.getElementById("aText");
+
+  const force=document.getElementById("force");
+  const fLine=document.getElementById("fLine");
+  const fHead=document.getElementById("fHead");
+  const fText=document.getElementById("fText");
+
+  const disp=document.getElementById("disp");
+  const xLine=document.getElementById("xLine");
+  const xHead=document.getElementById("xHead");
+  const xText=document.getElementById("xText");
+
+  const stateText=document.getElementById("stateText");
+  const status=document.getElementById("status");
+
+  const mx=document.getElementById("mx");
+  const mv=document.getElementById("mv");
+  const ma=document.getElementById("ma");
+  const mT=document.getElementById("mT");
+  const mf=document.getElementById("mf");
+
+  const play=document.getElementById("play");
+  const reset=document.getElementById("reset");
+
+  const amp=document.getElementById("amp");
+  const mass=document.getElementById("mass");
+  const springK=document.getElementById("springK");
+
+  const ampVal=document.getElementById("ampVal");
+  const massVal=document.getElementById("massVal");
+  const springKVal=document.getElementById("springKVal");
+
+  const showVelocity=document.getElementById("showVelocity");
+  const showAcceleration=document.getElementById("showAcceleration");
+  const showForce=document.getElementById("showForce");
+  const showDisplacement=document.getElementById("showDisplacement");
+
+  let running=true;
+  let elapsed=0;
+  let last=performance.now();
+
+  function params(){
+    const A=Number(amp.value);
+    const m=Number(mass.value);
+    const k=Number(springK.value);
+    const omega=Math.sqrt(k/m);
+    const T=2*Math.PI/omega;
+    const f=1/T;
+    return {A,m,k,omega,T,f};
+  }
+
+  function springPath(xStart,xEnd,y){
+    const lead=28;
+    const tail=16;
+    const coils=13;
+    const ampY=18;
+    const a=xStart+lead;
+    const b=Math.max(a+28,xEnd-tail);
+
+    let d=`M ${xStart} ${y} L ${a} ${y}`;
+    const n=150;
+
+    for(let i=0;i<=n;i++){
+      const u=i/n;
+      const x=a+(b-a)*u;
+      const yy=y+ampY*Math.sin(u*coils*2*Math.PI);
+      d+=` L ${x.toFixed(2)} ${yy.toFixed(2)}`;
+    }
+
+    return d+` L ${xEnd} ${y}`;
+  }
+
+  function horizontalArrow(group,line,head,text,startX,startY,endX,label){
+    const dx=endX-startX;
+    const dir=dx>=0?1:-1;
+
+    if(Math.abs(dx)<8){
+      group.setAttribute("opacity","0");
+      return;
+    }
+
+    group.setAttribute("opacity","1");
+
+    line.setAttribute("x1",startX);
+    line.setAttribute("y1",startY);
+    line.setAttribute("x2",endX-dir*12);
+    line.setAttribute("y2",startY);
+
+    head.setAttribute(
+      "points",
+      `${endX},${startY} `+
+      `${endX-dir*18},${startY-10} `+
+      `${endX-dir*18},${startY+10}`
+    );
+
+    text.textContent=label;
+    text.setAttribute("x",endX+dir*19);
+    text.setAttribute("y",startY+7);
+    text.setAttribute("text-anchor","middle");
+  }
+
+  function renderDisplacement(centerX){
+    if(!showDisplacement.checked || Math.abs(centerX-EQ)<5){
+      disp.setAttribute("opacity","0");
+      return;
+    }
+
+    const y=372;
+    const dir=centerX>EQ?1:-1;
+
+    disp.setAttribute("opacity","1");
+
+    xLine.setAttribute("x1",EQ);
+    xLine.setAttribute("y1",y);
+    xLine.setAttribute("x2",centerX-dir*10);
+    xLine.setAttribute("y2",y);
+
+    xHead.setAttribute(
+      "points",
+      `${centerX},${y} `+
+      `${centerX-dir*17},${y-9} `+
+      `${centerX-dir*17},${y+9}`
+    );
+
+    xText.setAttribute("x",(EQ+centerX)/2);
+    xText.setAttribute("y",y-12);
+  }
+
+  function rebuildMarks(){
+    const {A}=params();
+    const minusX=EQ-A*PX_PER_UNIT;
+    const plusX=EQ+A*PX_PER_UNIT;
+
+    markMinus.setAttribute("x1",minusX);
+    markMinus.setAttribute("x2",minusX);
+    markPlus.setAttribute("x1",plusX);
+    markPlus.setAttribute("x2",plusX);
+
+    labelMinus.setAttribute("x",minusX);
+    labelPlus.setAttribute("x",plusX);
+  }
+
+  function render(){
+    const {A,m,k,omega,T,f}=params();
+
+    // El ciclo comienza en -A.
+    const x=-A*Math.cos(omega*elapsed);
+    const v=A*omega*Math.sin(omega*elapsed);
+    const a=-omega*omega*x;
+    const F=-k*x;
+
+    const centerX=EQ+x*PX_PER_UNIT;
+    const cartLeft=centerX-CART_W/2;
+    const centerY=CART_Y+CART_CENTER_LOCAL_Y;
+
+    cart.setAttribute("transform",`translate(${cartLeft.toFixed(2)} ${CART_Y})`);
+    spring.setAttribute("d",springPath(WALL_X,cartLeft,SPRING_Y));
+
+    // Velocidad. Se coloca sobre el carrito para evitar superposición.
+    const vmax=A*omega;
+    const vr=vmax>0?Math.abs(v)/vmax:0;
+
+    if(!showVelocity.checked || vr<0.012){
+      velocity.setAttribute("opacity","0");
+    }else{
+      const dir=v>0?1:-1;
+      const length=32+98*vr;
+      const startX=centerX;
+      const startY=CART_Y-24;
+      horizontalArrow(
+        velocity,vLine,vHead,vText,
+        startX,startY,startX+dir*length,"v"
+      );
+    }
+
+    // Aceleración. Se muestra sobre la velocidad para distinguir ambas.
+    const amax=omega*omega*A;
+    const ar=amax>0?Math.abs(a)/amax:0;
+
+    if(!showAcceleration.checked || ar<0.012){
+      accel.setAttribute("opacity","0");
+    }else{
+      const dir=a>0?1:-1;
+      const length=28+78*ar;
+      const startX=centerX;
+      const startY=CART_Y-70;
+      horizontalArrow(
+        accel,aLine,aHead,aText,
+        startX,startY,startX+dir*length,"a"
+      );
+    }
+
+    // Fuerza restauradora F.
+    // IMPORTANTE: el origen está exactamente en el centro de masa del carrito.
+    const Fmax=k*A;
+    const Fr=Fmax>0?Math.abs(F)/Fmax:0;
+
+    if(!showForce.checked || Fr<0.012){
+      force.setAttribute("opacity","0");
+    }else{
+      const dir=F>0?1:-1;
+      const length=28+82*Fr;
+
+      horizontalArrow(
+        force,fLine,fHead,fText,
+        centerX,centerY,
+        centerX+dir*length,
+        "F"
+      );
+    }
+
+    renderDisplacement(centerX);
+
+    mx.textContent=(x>=0?"+":"")+x.toFixed(2)+" m";
+    mv.textContent=(v>=0?"+":"")+v.toFixed(2)+" m/s";
+    ma.textContent=(a>=0?"+":"")+a.toFixed(2)+" m/s²";
+    mT.textContent=T.toFixed(2)+" s";
+    mf.textContent=f.toFixed(2)+" Hz";
+
+    const edgeTol=Math.max(0.025,A*0.012);
+    const centerTol=Math.max(0.025,A*0.012);
+
+    if(Math.abs(x+A)<edgeTol){
+      stateText.textContent="Extremo izquierdo: x = −A";
+      status.textContent="−A · rapidez = 0 · |a| máxima · |F| máxima";
+    }else if(Math.abs(x-A)<edgeTol){
+      stateText.textContent="Extremo derecho: x = +A";
+      status.textContent="+A · rapidez = 0 · |a| máxima · |F| máxima";
+    }else if(Math.abs(x)<centerTol){
+      stateText.textContent="Posición de equilibrio: x = 0";
+      status.textContent="x = 0 · rapidez máxima · a = 0 · F = 0";
+    }else if(v>0){
+      stateText.textContent="Movimiento hacia la derecha";
+      status.textContent="La aceleración y la fuerza restauradora apuntan hacia el equilibrio";
+    }else{
+      stateText.textContent="Movimiento hacia la izquierda";
+      status.textContent="La aceleración y la fuerza restauradora apuntan hacia el equilibrio";
+    }
+  }
+
+  function syncControls(){
+    ampVal.textContent=Number(amp.value).toFixed(1)+" m";
+    massVal.textContent=Number(mass.value).toFixed(1)+" kg";
+    springKVal.textContent=Number(springK.value).toFixed(0)+" N/m";
+
+    elapsed=0;
+    rebuildMarks();
+    render();
+  }
+
+  function toggleOnly(){
+    render();
+  }
+
+  function loop(now){
+    if(running){
+      const dt=Math.min(0.05,(now-last)/1000);
+      elapsed+=dt;
+      render();
+    }
+    last=now;
+    requestAnimationFrame(loop);
+  }
+
+  play.addEventListener("click",()=>{
+    running=!running;
+    play.textContent=running?"Pausar":"Reproducir";
+    last=performance.now();
+  });
+
+  reset.addEventListener("click",()=>{
+    elapsed=0;
+    running=true;
+    play.textContent="Pausar";
+    rebuildMarks();
+    render();
+    last=performance.now();
+  });
+
+  amp.addEventListener("input",syncControls);
+  mass.addEventListener("input",syncControls);
+  springK.addEventListener("input",syncControls);
+
+  showVelocity.addEventListener("change",toggleOnly);
+  showAcceleration.addEventListener("change",toggleOnly);
+  showForce.addEventListener("change",toggleOnly);
+  showDisplacement.addEventListener("change",toggleOnly);
+
+  syncControls();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
