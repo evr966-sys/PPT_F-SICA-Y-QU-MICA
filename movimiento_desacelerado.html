@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movimiento desacelerado | automóvil</title>
+<style>
+  :root{
+    --bg:#edf5fc; --paper:#fff; --border:#c4d8e9; --navy:#17324e; --muted:#526f90;
+    --blue:#1468d7; --green:#119453; --violet:#8453b9; --road:#48556b; --amber:#f7d36b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--navy);padding:10px}
+  .layout{width:min(1140px,100%);margin:auto}
+  .panel{background:var(--paper);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 7px 23px rgba(28,67,99,.06)}
+  header{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:13px 17px}
+  h1{font-size:clamp(21px,2.4vw,30px);line-height:1.15;margin:0 0 5px}
+  header p{margin:0;font-size:14px;color:var(--muted);line-height:1.3}
+  .sign{border-radius:999px;background:#fff3e3;color:#a15c00;padding:7px 12px;font-size:14px;font-weight:800;white-space:nowrap;align-self:flex-start}
+  .stage{width:100%;overflow-x:auto;background:#ceeafb}
+  #scene{display:block;width:100%;height:auto;min-width:740px}
+  .readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--border);background:#f9fcff}
+  .metric{text-align:center;padding:10px 7px;border-right:1px solid var(--border)}
+  .metric:last-child{border-right:0}
+  .metric span{font-size:12px;display:block;color:var(--muted);font-weight:700;margin-bottom:4px}
+  .metric strong{font-size:19px;white-space:nowrap}
+  .controls{margin-top:10px;background:var(--paper);border:1px solid var(--border);border-radius:14px;padding:12px 15px;display:grid;gap:12px}
+  .controls-top,.controls-bottom{display:flex;align-items:center;gap:12px 20px;flex-wrap:wrap}
+  button{border-radius:9px;border:1px solid #aed0e9;background:#176faf;color:white;font-size:15px;font-weight:700;padding:9px 16px;cursor:pointer}
+  button.secondary{color:var(--navy);background:white}
+  button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+  .parameter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+  .parameter label{font-weight:700}
+  input[type=range]{accent-color:#176faf;cursor:pointer}
+  .parameter input{width:140px}
+  output{font-variant-numeric:tabular-nums;color:#1664aa;font-weight:800;white-space:nowrap}
+  .time{display:flex;align-items:center;gap:12px;width:100%;font-size:14px}
+  .time label{font-weight:700;white-space:nowrap}
+  .time input{flex:1;min-width:90px}
+  .time output{min-width:130px;text-align:right}
+  .checks{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+  .checks label{display:flex;align-items:center;gap:7px;cursor:pointer}
+  .checks input{width:16px;height:16px}
+  .note{font-size:13px;color:var(--muted);margin:0}
+  .interval-summary{border-top:1px solid var(--border);padding:10px 13px;background:#f2f9ff}
+  .interval-heading{display:flex;gap:6px 16px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+  .interval-heading strong{font-size:14px;color:#173c63}
+  .interval-heading span{font-size:12px;color:#557597}
+  .interval-cards{display:flex;gap:8px;overflow-x:auto;padding:0 0 3px;scrollbar-width:thin}
+  .interval-card{flex:1 0 84px;max-width:155px;min-width:84px;min-height:67px;display:flex;flex-direction:column;gap:2px;
+    background:#fff;border:1px solid #bbd6ea;border-radius:9px;padding:6px 9px;align-items:center;justify-content:center}
+  .interval-card .pair{font-size:12px;color:#466988;font-weight:700}
+  .interval-card strong{font-size:17px;color:#125f9e;font-variant-numeric:tabular-nums}
+  .interval-card .duration{font-size:11px;color:#627e99}
+  .interval-card .bar{height:4px;border-radius:8px;background:#e5f0f9;width:100%;overflow:hidden;margin-top:2px}
+  .interval-card .bar i{display:block;height:100%;background:#2689c2;border-radius:8px}
+  .interval-card:last-child{border-color:#71aacb}
+  .interval-summary[hidden]{display:none}
+  .stop-badge{font-weight:700;color:#0b7344}
+
+  details{background:white;border:1px solid var(--border);border-radius:12px;margin-top:10px;overflow:hidden}
+  summary{cursor:pointer;padding:11px 14px;font-weight:700;font-size:14px;user-select:none}
+  .table-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+  th,td{padding:8px 9px;text-align:center;border-top:1px solid #e4edf4}
+  th{background:#f2f8fe}
+  .table-note{padding:9px 12px;font-size:12px;color:var(--muted);border-top:1px solid #e4edf4}
+  @media(max-width:730px){
+    .readouts{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .metric:nth-child(2){border-right:0}
+    .metric:nth-child(-n+2){border-bottom:1px solid var(--border)}
+    header{padding:12px}
+    .time{flex-wrap:wrap}
+    .time label{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="panel">
+    <header>
+      <div>
+        <h1>Movimiento desacelerado</h1>
+        <p>El automóvil avanza hacia la derecha, pero su rapidez disminuye; la <strong>velocidad</strong> apunta a la derecha y la <strong>aceleración</strong> a la izquierda.</p>
+      </div>
+      <span class="sign">a &lt; 0</span>
+    </header>
+
+    <div class="stage">
+      <svg id="scene" viewBox="0 0 1000 452" role="img" aria-label="Auto desacelerado recorriendo la pista con velocidad decreciente">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#a4d8fb"/><stop offset="1" stop-color="#eaf7ff"/>
+          </linearGradient>
+          <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="#fff6b3"/><stop offset=".8" stop-color="#ffd660"/><stop offset="1" stop-color="#f6b52a"/>
+          </radialGradient>
+          <marker id="tipBlue" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0 0 L21 12 L0 24 Z" fill="#1468d7"/>
+          </marker>
+          <marker id="tipGreen" markerWidth="24" markerHeight="24" refX="21" refY="12" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0 0 L21 12 L0 24 Z" fill="#119453"/>
+          </marker>
+          <g id="autoArt">
+            <ellipse cx="0" cy="9" rx="58" ry="7" fill="#1c3144" opacity=".22"/>
+            <path d="M -57 -10 L -54 -23 L -41 -26 L -27 -43 L 10 -43 Q26 -43 39 -25 L 54 -20 Q59 -18 59 -8 L59 -1 L-59 -1 L-59 -7 Z" fill="#ef5b41" stroke="#aa392c" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M -29 -40 L 10 -40 Q23 -40 34 -24 L-41 -24 Z" fill="#bce6fa" stroke="#c84737" stroke-width="1.8"/>
+            <path d="M 0 -39 L0 -25" fill="none" stroke="#c84737" stroke-width="2.3"/>
+            <path d="M-56 -9 L54 -9" stroke="#ffb7a3" stroke-width="1" opacity=".6"/>
+            <rect x="52" y="-16" width="7" height="6" rx="2" fill="#fff5a8"/>
+            <rect x="-60" y="-18" width="5" height="7" rx="1" fill="#b3292c"/>
+            <circle cx="-33" cy="0" r="12" fill="#243448"/><circle cx="35" cy="0" r="12" fill="#243448"/>
+            <circle cx="-33" cy="0" r="5" fill="#a2b7c8"/><circle cx="35" cy="0" r="5" fill="#a2b7c8"/>
+          </g>
+        </defs>
+
+        <rect width="1000" height="262" fill="url(#sky)"/>
+        <circle cx="914" cy="55" r="27" fill="url(#sun)"/>
+        <g fill="#fff" opacity=".82">
+          <ellipse cx="350" cy="54" rx="48" ry="15"/><ellipse cx="318" cy="59" rx="34" ry="12"/><ellipse cx="391" cy="61" rx="30" ry="12"/>
+          <ellipse cx="638" cy="43" rx="47" ry="15"/><ellipse cx="600" cy="48" rx="33" ry="12"/>
+        </g>
+
+        <g id="intervalArcs"></g>
+        <rect x="0" y="260" width="1000" height="126" fill="#48556b"/>
+        <rect x="0" y="260" width="1000" height="9" fill="#303e51"/>
+        <line x1="34" y1="319" x2="963" y2="319" stroke="#f8d571" stroke-width="4.5" stroke-dasharray="44 27"/>
+        <g id="ghostsLayer"></g>
+        <g id="stationMarks"></g>
+        <g id="intervalBrackets"></g>
+
+        <g id="currentCar" transform="translate(102 260)">
+          <use href="#autoArt"/>
+        </g>
+
+        <g id="movingVectors" aria-label="Vectores que acompañan al automóvil">
+          <g id="accVectorGroup">
+            <text id="aValueMove" x="0" y="0" font-size="16" font-weight="800" fill="#0a884b" text-anchor="end">a = −0,6 m/s²</text>
+            <g id="accArrowGeometry">
+              <line id="aArrowMoveHalo" x1="0" y1="18" x2="-70" y2="18" stroke="#ffffff" stroke-opacity="0.9" stroke-width="11" stroke-linecap="round"/>
+              <line id="aArrowMove" x1="0" y1="18" x2="-70" y2="18" stroke="#119453" stroke-width="7" stroke-linecap="round" marker-end="url(#tipGreen)"/>
+            </g>
+          </g>
+          <g id="velVectorGroup">
+            <text id="vValueMove" x="0" y="0" font-size="16" font-weight="800" fill="#1468d7">v = 6,0 m/s</text>
+            <g id="velArrowGeometry">
+              <line id="vArrowMoveHalo" x1="0" y1="18" x2="80" y2="18" stroke="#ffffff" stroke-opacity="0.9" stroke-width="11" stroke-linecap="round"/>
+              <line id="vArrowMove" x1="0" y1="18" x2="80" y2="18" stroke="#1468d7" stroke-width="7" stroke-linecap="round" marker-end="url(#tipBlue)"/>
+            </g>
+          </g>
+        </g>
+
+        <rect x="0" y="386" width="1000" height="66" fill="#33465e"/>
+        <g id="meterRuler"></g>
+      </svg>
+    </div>
+
+    <section class="interval-summary" id="intervalSummary" aria-label="Distancias recorridas entre posiciones sucesivas" hidden>
+      <div class="interval-heading"><strong>Distancias en cada intervalo</strong><span>Las separaciones disminuyen al frenar · las cotas pequeñas también se muestran aquí</span></div>
+      <div class="interval-cards" id="intervalCards"></div>
+    </section>
+
+    <div class="readouts" aria-live="polite">
+      <div class="metric"><span>Tiempo transcurrido</span><strong id="readTime">0,00 s</strong></div>
+      <div class="metric"><span>Velocidad instantánea</span><strong id="readSpeed">6,00 m/s</strong></div>
+      <div class="metric"><span>Aceleración</span><strong style="color:#119453" id="readAcc">−0,60 m/s²</strong></div>
+      <div class="metric"><span>Distancia recorrida</span><strong id="readDistance">0,00 m</strong></div>
+    </div>
+  </div>
+
+  <section class="controls" aria-label="Controles del simulador">
+    <div class="controls-top">
+      <button id="play" type="button">Pausar</button>
+      <button id="reset" type="button" class="secondary">Reiniciar</button>
+      <div class="parameter"><label for="v0">Velocidad inicial</label><input id="v0" type="range" min="2" max="10" step="0.5" value="6"><output id="v0Label">6,0 m/s</output></div>
+      <div class="parameter"><label for="a">Magnitud de desaceleración</label><input id="a" type="range" min="0.2" max="2" step="0.1" value="0.6"><output id="aLabel">0,6 m/s²</output></div>
+    </div>
+    <div class="time"><label for="scrub">Explorar tiempo</label><input id="scrub" type="range" min="0" max="10" step="any" value="0"><output id="scrubLabel">0,00 / 10,00 s</output></div>
+    <div class="controls-bottom">
+      <div class="checks">
+        <label><input id="showV" type="checkbox" checked> Mostrar velocidad</label>
+        <label><input id="showA" type="checkbox" checked> Mostrar aceleración</label>
+        <label><input id="showMarks" type="checkbox" checked> Posiciones cada segundo</label>
+        <label><input id="showDistances" type="checkbox" aria-controls="intervalSummary"> Mostrar distancias por intervalo</label>
+        <label><input id="showGhosts" type="checkbox"> Autos de referencia</label>
+      </div>
+      <p class="note" id="finishNote">Pista fija de 30 m. El auto puede detenerse antes de llegar a la meta según el frenado.</p>
+    </div>
+  </section>
+
+  <details id="tableDetails">
+    <summary>Consultar distancias AB, BC, CD… y velocidades por intervalo</summary>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Tramo</th><th>Tiempo inicial</th><th>Tiempo final</th><th>Δt</th><th>Distancia del tramo</th><th>Velocidad final</th></tr></thead>
+        <tbody id="intervalRows"></tbody>
+      </table>
+    </div>
+    <div class="table-note">Cada intervalo completo dura 1 s; el último puede ser más corto. Si el auto se detiene antes de los 30 m, permanece en esa posición y la aceleración pasa a cero.</div>
+  </details>
+</div>
+
+<script>
+(()=>{
+  'use strict';
+  const NS='http://www.w3.org/2000/svg';
+  const GOAL=30, X0=102, X1=900, RY=260, SCALE=(X1-X0)/GOAL;
+  const el=id=>document.getElementById(id);
+  const state={t:0,playing:true,last:0};
+  const f=(n,d=2)=>Number(n).toFixed(d).replace('.',',');
+
+  const params=()=>({v0:Number(el('v0').value), aMag:Number(el('a').value)});
+  const stopTime=()=>{const {v0,aMag}=params(); return v0/aMag;};
+  const stopDistance=()=>{const {v0,aMag}=params(); return v0*v0/(2*aMag);};
+  const goalTime=()=>{
+    const {v0,aMag}=params();
+    const disc=v0*v0-2*aMag*GOAL;
+    if(disc < -1e-9) return Infinity;
+    // Stable root of v0*t - 1/2*a*t*t = GOAL, during the braking phase.
+    return 2*GOAL/(v0+Math.sqrt(Math.max(0,disc)));
+  };
+  const finalTime=()=>Math.min(stopTime(),goalTime());
+  const distance=t=>{
+    const {v0,aMag}=params();
+    const effective=Math.max(0,Math.min(t,stopTime()));
+    return Math.max(0,Math.min(GOAL,v0*effective-.5*aMag*effective*effective));
+  };
+  const velocity=t=>{
+    const {v0,aMag}=params();
+    return Math.max(0,v0-aMag*Math.max(0,t));
+  };
+  const trulyStopped=t=>t>=stopTime()-1e-7 && stopDistance()<=GOAL+1e-7;
+  const currentAcceleration=t=>trulyStopped(t)?0:-params().aMag;
+  const coord=d=>X0+d*SCALE;
+
+  function svg(tag,attributes={},text){
+    const n=document.createElementNS(NS,tag);
+    for(const [key,val] of Object.entries(attributes)) n.setAttribute(key,String(val));
+    if(text!==undefined) n.textContent=text;
+    return n;
+  }
+  function clear(n){n.replaceChildren();}
+
+  function stationTimes(){
+    const T=finalTime(), ts=[0];
+    for(let s=1; s<T-1e-8; s++) ts.push(s);
+    ts.push(T);
+    return ts;
+  }
+  function getStations(){
+    return stationTimes().map((t,i)=>({label:String.fromCharCode(65+i),t,d:distance(t),v:velocity(t),x:coord(distance(t))}));
+  }
+
+  function drawRuler(){
+    const g=el('meterRuler'); clear(g);
+    for(let meter=0; meter<=GOAL; meter+=5){
+      const x=coord(meter);
+      g.append(svg('line',{x1:x,y1:400,x2:x,y2:416,stroke:'#d5e3ef','stroke-width':2.5}));
+      g.append(svg('text',{x,y:438,'text-anchor':'middle','font-size':17,'font-weight':700,fill:'#fff'},`${meter} m`));
+    }
+  }
+
+  function drawFixedScene(){
+    const arcs=el('intervalArcs'), marks=el('stationMarks'), brackets=el('intervalBrackets'), ghosts=el('ghostsLayer');
+    [arcs,marks,brackets,ghosts].forEach(clear);
+    if(!el('showMarks').checked) return;
+    const s=getStations();
+    let lastLabelX=-1000,lastGhostX=-1000;
+    const manyStations=s.length>9;
+    for(let i=0;i<s.length;i++){
+      const current=s[i];
+      marks.append(svg('line',{x1:current.x,y1:206,x2:current.x,y2:260,stroke:'#81b6d8','stroke-width':2,'stroke-dasharray':'6 6'}));
+      const marker=svg('circle',{cx:current.x,cy:260,r:4.8,fill:'#1887c8'});
+      marker.append(svg('title',{},`${current.label}: t=${f(current.t)} s, d=${f(current.d)} m, v=${f(current.v)} m/s`));
+      marks.append(marker);
+      const isFirst=i===0,isLast=i===s.length-1;
+      const closePrevious=i>0 && current.x-s[i-1].x<38;
+      const availableBeforeFinish=X1-current.x;
+      const canLabel=manyStations
+        ? (isFirst || isLast || (current.x-lastLabelX>=84 && availableBeforeFinish>=85))
+        : (isFirst || isLast || current.x-lastLabelX>=38);
+      if(canLabel){
+        let labelText;
+        if(manyStations){
+          labelText=isFirst?'0 s':isLast?(current.d>=GOAL-1e-5?'Meta':'Alto'):`${Math.round(current.t)} s`;
+        }else labelText=current.label;
+        const labelSize=manyStations?14:19;
+        // Last two close positions E and F are staggered and point to their exact marks.
+        const labelY=closePrevious?307:292;
+        marks.append(svg('text',{x:current.x,y:labelY,'text-anchor':'middle','font-size':labelSize,'font-weight':800,fill:'#fff'},labelText));
+        lastLabelX=current.x;
+      }
+      if(el('showGhosts').checked && i>0 && i<s.length-1 && current.x-X0>=65 && current.x-lastGhostX>84){
+        ghosts.append(svg('use',{href:'#autoArt',transform:`translate(${current.x} ${RY}) scale(0.58)`,opacity:0.26}));
+        lastGhostX=current.x;
+      }
+      if(i===s.length-1)break;
+      const next=s[i+1], span=next.x-current.x, mid=(current.x+next.x)/2;
+      if(!manyStations && span>=94){
+        arcs.append(svg('path',{d:`M${current.x} 198 Q${mid} 152 ${next.x} 198`,fill:'none',stroke:'#9b64c7','stroke-width':2.8,'stroke-linecap':'round'}));
+        arcs.append(svg('text',{x:mid,y:167,'text-anchor':'middle','font-size':15,'font-weight':700,fill:'#733d9d'},`Δt = ${f(next.t-current.t,2)} s`));
+      }
+      if(el('showDistances').checked && !manyStations && span>=72){
+        const left=current.x+7,right=next.x-7;
+        brackets.append(svg('line',{x1:left,y1:359,x2:right,y2:359,stroke:'#a7eeff','stroke-width':2.5}));
+        brackets.append(svg('line',{x1:left,y1:354,x2:left,y2:364,stroke:'#a7eeff','stroke-width':2.5}));
+        brackets.append(svg('line',{x1:right,y1:354,x2:right,y2:364,stroke:'#a7eeff','stroke-width':2.5}));
+        brackets.append(svg('text',{x:mid,y:378,'text-anchor':'middle','font-size':14,'font-weight':800,fill:'#fff'},`${f(next.d-current.d,1)} m`));
+      }
+    }
+  }
+
+  function drawIntervalCards(){
+    const cards=el('intervalCards');cards.replaceChildren();
+    const show=el('showDistances').checked;
+    el('intervalSummary').hidden=!show;
+    if(!show) return;
+    const stations=getStations();
+    const firstDistance=stations.length>1?stations[1].d-stations[0].d:0;
+    for(let i=0;i<stations.length-1;i++){
+      const from=stations[i],to=stations[i+1];
+      const deltaD=to.d-from.d,deltaT=to.t-from.t;
+      const card=document.createElement('div');card.className='interval-card';
+      const pair=document.createElement('span');pair.className='pair';pair.textContent=`${from.label}–${to.label}`;
+      const dist=document.createElement('strong');dist.textContent=`${f(deltaD,1)} m`;
+      const duration=document.createElement('span');duration.className='duration';duration.textContent=`${f(deltaT,2)} s`;
+      const bg=document.createElement('span');bg.className='bar';
+      const bar=document.createElement('i');bar.style.width=`${firstDistance>0?Math.max(0,Math.min(100,100*deltaD/firstDistance)):0}%`;
+      bg.append(bar);card.append(pair,dist,duration,bg);cards.append(card);
+    }
+  }
+
+  function fillTable(){
+    const rows=el('intervalRows'); rows.replaceChildren(); const s=getStations();
+    for(let i=0;i<s.length-1;i++){
+      const a=s[i],b=s[i+1], tr=document.createElement('tr');
+      [`${a.label}–${b.label}`,`${f(a.t,2)} s`,`${f(b.t,2)} s`,`${f(b.t-a.t,2)} s`,`${f(b.d-a.d,2)} m`,`${f(b.v,2)} m/s`]
+        .forEach(content=>{const td=document.createElement('td'); td.textContent=content; tr.append(td);});
+      rows.append(tr);
+    }
+  }
+
+  function placeMovingVectors(carX,v,aMag,isStopped){
+    const velLen=v<.001?0:20+v*12;
+    const accLen=isStopped?0:Math.min(110,46+aMag*32);
+    // Numeric labels continue with the car. Arrowheads are hidden at zero speed/acceleration.
+    const velX=Math.max(18,Math.min(1000-Math.max(velLen,95)-26,carX-48));
+    const accX=Math.max(155,Math.min(860,carX+38));
+    el('velVectorGroup').setAttribute('transform',`translate(${velX} 108)`);
+    el('accVectorGroup').setAttribute('transform',`translate(${accX} 46)`);
+    el('vArrowMoveHalo').setAttribute('x2',velLen);
+    el('vArrowMove').setAttribute('x2',velLen);
+    el('aArrowMoveHalo').setAttribute('x2',-accLen);
+    el('aArrowMove').setAttribute('x2',-accLen);
+    el('vValueMove').textContent=`v = ${f(v,1)} m/s`;
+    el('aValueMove').textContent=isStopped?'a = 0,0 m/s²':`a = −${f(aMag,1)} m/s²`;
+    el('velVectorGroup').setAttribute('visibility',el('showV').checked?'visible':'hidden');
+    el('accVectorGroup').setAttribute('visibility',el('showA').checked?'visible':'hidden');
+    el('velArrowGeometry').setAttribute('visibility',velLen>0?'visible':'hidden');
+    el('accArrowGeometry').setAttribute('visibility',accLen>0?'visible':'hidden');
+  }
+
+  function render(){
+    const T=finalTime(),t=Math.max(0,Math.min(T,state.t)),{v0,aMag}=params();
+    state.t=t;
+    const d=distance(t),carX=coord(d),v=velocity(t),stopped=trulyStopped(t);
+    const a=currentAcceleration(t);
+    el('currentCar').setAttribute('transform',`translate(${carX} ${RY})`);
+    placeMovingVectors(carX,v,aMag,stopped);
+    el('readTime').textContent=`${f(t)} s`;
+    el('readSpeed').textContent=`${f(v)} m/s`;
+    el('readAcc').textContent=`${a<0?'−':''}${f(Math.abs(a))} m/s²`;
+    el('readDistance').textContent=`${f(d)} m`;
+    el('v0Label').textContent=`${f(v0,1)} m/s`;
+    el('aLabel').textContent=`${f(aMag,1)} m/s²`;
+    el('scrubLabel').textContent=`${f(t)} / ${f(T)} s`;
+    el('scrub').max=T.toString();el('scrub').value=t;
+    const goalReached=Math.abs(d-GOAL)<1e-6;
+    if(t>=T-1e-8){
+      el('finishNote').textContent=stopped
+        ?(goalReached?`El automóvil se detuvo exactamente en los 30 m, en ${f(T)} s. Después del frenado, a = 0.`
+                     :`Detenido a los ${f(d)} m en ${f(T)} s: faltan ${f(GOAL-d)} m para la meta. Al detenerse, a = 0.`)
+        :`Llegó a los 30 m en ${f(T)} s con v = ${f(v)} m/s: aún se desplazaba al finalizar la pista.`;
+    }else{
+      el('finishNote').textContent=`Pista de 30 m · Frenado constante: −${f(aMag,1)} m/s² · Tiempo hasta finalizar: ${f(T)} s.`;
+    }
+  }
+
+  function updateControls(reset=true){
+    if(reset){state.t=0;state.playing=true;state.last=performance.now();el('play').textContent='Pausar';}
+    drawFixedScene(); drawIntervalCards(); fillTable(); render();
+  }
+
+  el('play').addEventListener('click',()=>{
+    const T=finalTime();
+    if(state.t>=T-1e-8) state.t=0;
+    state.playing=!state.playing;
+    state.last=performance.now();
+    el('play').textContent=state.playing?'Pausar':'Continuar';
+    render();
+  });
+  el('reset').addEventListener('click',()=>{state.t=0;state.playing=false;el('play').textContent='Iniciar';render();});
+  for(const id of ['v0','a']) el(id).addEventListener('input',()=>updateControls(true));
+  for(const id of ['showV','showA','showMarks','showGhosts','showDistances']) el(id).addEventListener('change',()=>updateControls(false));
+  el('scrub').addEventListener('input',e=>{state.playing=false;el('play').textContent='Continuar';state.t=Number(e.target.value);el('play').textContent=state.t>=finalTime()-1e-8?'Repetir':'Continuar';render();});
+
+  function animate(now){
+    if(!state.last) state.last=now;
+    if(state.playing){
+      const dt=Math.min(.04,(now-state.last)/1000);
+      state.t+=dt;
+      const T=finalTime();
+      if(state.t>=T){state.t=T;state.playing=false;el('play').textContent='Repetir';}
+      render();
+    }
+    state.last=now;
+    requestAnimationFrame(animate);
+  }
+
+  drawRuler();
+  updateControls(true);
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
