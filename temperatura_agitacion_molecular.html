@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temperatura y agitación molecular</title>
+<style>
+  :root{
+    --bg:#eef6fc;
+    --panel:#ffffff;
+    --border:#c9dcec;
+    --text:#17324e;
+    --muted:#56718d;
+    --blue:#1771c9;
+    --blue2:#2d8de0;
+    --green:#149a60;
+    --orange:#f28c28;
+    --red:#d94841;
+    --ice:#4ea3ff;
+    --shadow:0 8px 24px rgba(18, 56, 92, .08);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background:linear-gradient(180deg,#eef7fd,#e7f2fb);
+    color:var(--text);
+    padding:14px;
+  }
+  .wrap{
+    width:min(1180px,100%);
+    margin:auto;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  header{
+    padding:18px 20px 14px;
+    border-bottom:1px solid #e9f1f7;
+  }
+  h1{
+    margin:0 0 6px;
+    font-size:clamp(22px,2.5vw,32px);
+    color:#122a42;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    line-height:1.45;
+    font-size:15px;
+  }
+  .topbar{
+    display:flex;
+    gap:12px;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .tag{
+    background:#e8f4ff;
+    color:#1560a8;
+    border:1px solid #cfe6fb;
+    font-weight:700;
+    padding:6px 14px;
+    border-radius:999px;
+    white-space:nowrap;
+    font-size:13px;
+  }
+  .tabs{
+    display:flex;
+    gap:8px;
+    padding:14px 20px 0;
+    flex-wrap:wrap;
+  }
+  .tab{
+    border:none;
+    border-radius:12px 12px 0 0;
+    padding:12px 22px;
+    background:#e4eff8;
+    color:#3a5c80;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab:hover{
+    background:#d8e8f6;
+  }
+  .tab.active{
+    background:#ffffff;
+    color:#114a83;
+    border-top:3px solid var(--blue);
+    border-left:1px solid var(--border);
+    border-right:1px solid var(--border);
+    margin-bottom:-1px;
+    position:relative;
+    z-index:2;
+  }
+  .content{
+    display:grid;
+    grid-template-columns:360px 1fr;
+    gap:16px;
+    padding:16px 20px 20px;
+    border-top:1px solid var(--border);
+  }
+  .card{
+    background:#fbfdff;
+    border:1px solid #d8e8f5;
+    border-radius:16px;
+    padding:16px;
+  }
+  .controls h2, .info h2{
+    margin:0 0 14px;
+    font-size:18px;
+    color:#173656;
+  }
+  .control-group{
+    margin-bottom:14px;
+  }
+  .control-group label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:700;
+    font-size:14px;
+  }
+  input[type=range]{
+    width:100%;
+    accent-color:var(--blue);
+    cursor:pointer;
+    height:6px;
+  }
+  .value{
+    font-weight:800;
+    color:#165fa4;
+    font-size:22px;
+    margin-top:6px;
+    font-variant-numeric:tabular-nums;
+  }
+  .preset-row{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .preset{
+    border:1px solid #bfd7eb;
+    background:white;
+    color:#1d4f7d;
+    border-radius:8px;
+    padding:6px 10px;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .preset:hover{
+    background:#eaf4fc;
+    border-color:#9dc1e0;
+  }
+  .preset.active-preset{
+    background:#1771c9;
+    color:white;
+    border-color:#1771c9;
+  }
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    margin-top:14px;
+  }
+  .stat{
+    background:white;
+    border:1px solid #d9e9f6;
+    border-radius:12px;
+    padding:10px 12px;
+    min-height:70px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .stat span{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    margin-bottom:4px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  .stat strong{
+    font-size:16px;
+    color:#1b3d61;
+  }
+  .note{
+    margin-top:14px;
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+  .scene-card{
+    display:grid;
+    gap:14px;
+  }
+  .canvas-container{
+    position:relative;
+    width:100%;
+    background:#f7fbff;
+    border:1px solid #d7e7f3;
+    border-radius:16px;
+    overflow:hidden;
+  }
+  canvas{
+    width:100%;
+    height:auto;
+    aspect-ratio:16/10;
+    display:block;
+  }
+  .legend{
+    display:flex;
+    gap:10px 18px;
+    flex-wrap:wrap;
+    align-items:center;
+    font-size:13px;
+    color:var(--muted);
+    padding:8px 4px 0;
+  }
+  .legend-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+  }
+  .dot{
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    display:inline-block;
+  }
+  .blue{background:#1976d2}
+  .green{background:#1ca56b}
+  .orange{background:#f1992d}
+  .red{background:#d94841}
+  .banner{
+    background:#eef8ff;
+    color:#24567f;
+    border:1px solid #d1e8fa;
+    border-radius:12px;
+    padding:10px 14px;
+    line-height:1.45;
+    font-size:14px;
+    margin-bottom:12px;
+  }
+  .pill{
+    display:inline-block;
+    border-radius:999px;
+    padding:4px 12px;
+    font-size:13px;
+    font-weight:800;
+    background:#ecf7ef;
+    color:#127c4a;
+    border:1px solid #d4eedc;
+    margin-bottom:8px;
+  }
+  .state-solid{background:#edf6ff;color:#1f65bf;border-color:#d4e7ff}
+  .state-liquid{background:#ecfff7;color:#15734f;border-color:#d4f3e5}
+  .state-gas{background:#fff4ea;color:#b45f0d;border-color:#ffe0be}
+  .footer{
+    padding:0 20px 20px;
+  }
+  .teacher-note{
+    background:#fffbf2;
+    border:1px solid #f2ddad;
+    color:#785413;
+    border-radius:14px;
+    padding:12px 16px;
+    line-height:1.5;
+    font-size:14px;
+  }
+  .hidden{display:none !important}
+  @media(max-width:960px){
+    .content{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <header>
+      <div class="topbar">
+        <div>
+          <h1>Temperatura y agitación molecular</h1>
+          <p>Simulador interactivo del modelo cinético: relación entre temperatura, velocidad y estados de la materia.</p>
+        </div>
+        <div class="tag">Física Secundaria</div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" id="tabGas">Gas Ideal</button>
+      <button class="tab" id="tabAgua">Agua (Cambios de estado)</button>
+    </div>
+
+    <div class="content">
+      <!-- Panel de Controles Izquierdo -->
+      <section class="card controls">
+        <!-- Pestaña Gas -->
+        <div id="panelGas">
+          <h2>Controles del Gas</h2>
+          <div class="control-group">
+            <label for="gasTemp">Temperatura del gas (°C)</label>
+            <input id="gasTemp" type="range" min="0" max="500" step="1" value="25">
+            <div class="value" id="gasTempValue">25 °C <span style="font-size:14px;color:var(--muted);font-weight:500;">(298 K)</span></div>
+          </div>
+          <div class="preset-row">
+            <button class="preset" data-gas="0">0 °C</button>
+            <button class="preset active-preset" data-gas="25">25 °C (Ambiente)</button>
+            <button class="preset" data-gas="100">100 °C</button>
+            <button class="preset" data-gas="300">300 °C (Horno)</button>
+            <button class="preset" data-gas="500">500 °C</button>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <span>Agitación térmica</span>
+              <strong id="gasAgitation">Media</strong>
+            </div>
+            <div class="stat">
+              <span>Choques con paredes (simulados)</span>
+              <strong id="gasCollisions">0 / s</strong>
+            </div>
+            <div class="stat">
+              <span>Rapidez cuadrática media (N₂)</span>
+              <strong id="gasSpeedLabel">~515 m/s</strong>
+            </div>
+            <div class="stat">
+              <span>Disposición</span>
+              <strong>Libre y desordenada</strong>
+            </div>
+          </div>
+
+          <p class="note">
+            En un <strong>gas</strong>, las partículas se mueven libremente y chocan contra las paredes generando presión. Al aumentar la temperatura, se incrementa su <strong>energía cinética promedio</strong> (energía cinética promedio).
+          </p>
+        </div>
+
+        <!-- Pestaña Agua -->
+        <div id="panelAgua" class="hidden">
+          <h2>Controles del Agua</h2>
+          <div class="control-group">
+            <label for="waterTemp">Temperatura del agua (°C)</label>
+            <input id="waterTemp" type="range" min="-20" max="500" step="1" value="20">
+            <div class="value" id="waterTempValue">20 °C</div>
+          </div>
+          <div class="preset-row">
+            <button class="preset" data-water="-10">−10 °C (Congelador)</button>
+            <button class="preset" data-water="0">0 °C (Fusión: coexistencia)</button>
+            <button class="preset active-preset" data-water="20">20 °C (Líquida)</button>
+            <button class="preset" data-water="80">80 °C (Té caliente)</button>
+            <button class="preset" data-water="100">100 °C (Ebullición: coexistencia)</button>
+            <button class="preset" data-water="120">120 °C (Vapor)</button>
+            <button class="preset" data-water="300">300 °C (Vapor)</button>
+            <button class="preset" data-water="500">500 °C (Vapor)</button>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <span>Estado térmico</span>
+              <strong id="waterStateText">Líquido</strong>
+            </div>
+            <div class="stat">
+              <span>Agitación</span>
+              <strong id="waterAgitation">Media</strong>
+            </div>
+            <div class="stat">
+              <span>Movimiento</span>
+              <strong id="waterMotion">Deslizamiento mutuo</strong>
+            </div>
+            <div class="stat">
+              <span>Cohesión intermolecular</span>
+              <strong id="waterObservation">Fuerzas medias</strong>
+            </div>
+          </div>
+
+          <p class="note">
+            A presión atmosférica estándar (1 atm): por debajo de 0 °C predomina el hielo; entre 0 °C y 100 °C, el agua líquida; por encima de 100 °C, el vapor. En los puntos de fusión y ebullición pueden coexistir dos fases. A 1 atm, a 120–500 °C se representa vapor sobrecalentado. Modelo esquemático: el número de círculos y sus distancias no están a escala ni indican la cantidad real de materia.
+          </p>
+        </div>
+      </section>
+
+      <!-- Panel Gráfico Derecho -->
+      <section class="scene-card">
+        <div class="card">
+          <!-- Bloque Escena Gas -->
+          <div id="gasSceneBlock">
+            <div class="banner">
+              <strong>Gas cerrado:</strong> a mayor temperatura, mayor agitación térmica, mayor rapidez media y choques más enérgicos con las paredes.
+            </div>
+            <div class="canvas-container">
+              <canvas id="gasCanvas" width="840" height="520"></canvas>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><span class="dot blue"></span> Partículas gaseosas en colisión continua</div>
+              <div class="legend-item"><span class="dot orange"></span> Indicador de energía cinética térmica</div>
+            </div>
+          </div>
+
+          <!-- Bloque Escena Agua -->
+          <div id="waterSceneBlock" class="hidden">
+            <div class="banner">
+              <strong>Agua y estados de la materia:</strong> compara cómo la misma molécula (H₂O) pasa de vibrar fija en el hielo, a fluir en el líquido y dispersarse en vapor.
+            </div>
+            <div class="canvas-container">
+              <canvas id="waterCanvas" width="840" height="520"></canvas>
+            </div>
+            <div class="legend">
+              <div class="legend-item"><span class="dot blue"></span> Sólido: vibración en red ordenada</div>
+              <div class="legend-item"><span class="dot green"></span> Líquido: fluidos cercanos y deslizamiento</div>
+              <div class="legend-item"><span class="dot red"></span> Vapor: partículas libres y separadas</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card info">
+          <h2>Fundamento Didáctico</h2>
+          <div id="gasInfo">
+            <p class="pill">Modelo Cinético Molecular</p>
+            <p><strong>¿Qué es la temperatura?</strong> Es una medida macroscópica de la energía cinética promedio de traslación de las partículas: $\langle E_c \rangle \propto T$.</p>
+            <p><strong>Aumento térmico:</strong> Las moléculas no crecen de tamaño; lo que aumenta es su <strong>rapidez promedio</strong> y la intensidad de los choques.</p>
+            <p><strong>Cero absoluto (0 K = −273,15 °C):</strong> Límite inferior de la temperatura; incluso allí pueden persistir movimientos cuánticos.</p>
+          </div>
+
+          <div id="waterInfo" class="hidden">
+            <p class="pill" id="waterStateBadge">Líquido</p>
+            <p><strong>Hielo (por debajo de 0 °C):</strong> Las moléculas no viajan libremente por el espacio; se mantienen fijas en una red y <em>vibran</em> en su lugar.</p>
+            <p><strong>A 0 °C y 100 °C:</strong> puede haber coexistencia de fases durante el cambio de estado (a 1 atm).</p>
+            <p><strong>Agua líquida (entre 0 °C y 100 °C):</strong> Tienen suficiente energía para romper la red rígida, adaptándose al recipiente mientras permanecen unidas.</p>
+            <p><strong>Vapor de agua (por encima de 100 °C):</strong> Las moléculas pueden separarse ampliamente y desplazarse libremente; las moléculas H₂O permanecen intactas.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <div class="teacher-note">
+        <strong>💡 Recomendación para tu exposición:</strong> Recuérdale a los estudiantes la diferencia clave: el <strong>calor</strong> es energía que fluye de un cuerpo a otro por diferencia térmica, mientras que la <strong>temperatura</strong> es una magnitud relacionada con la agitación térmica microscópica.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const el = id => document.getElementById(id);
+  let activeTab = "gas";
+
+  // Sincronización y cambio de pestañas
+  function setTab(tab){
+    activeTab = tab;
+    el("tabGas").classList.toggle("active", tab === "gas");
+    el("tabAgua").classList.toggle("active", tab === "agua");
+
+    el("panelGas").classList.toggle("hidden", tab !== "gas");
+    el("panelAgua").classList.toggle("hidden", tab !== "agua");
+
+    el("gasSceneBlock").classList.toggle("hidden", tab !== "gas");
+    el("waterSceneBlock").classList.toggle("hidden", tab !== "agua");
+
+    el("gasInfo").classList.toggle("hidden", tab !== "gas");
+    el("waterInfo").classList.toggle("hidden", tab !== "agua");
+  }
+
+  el("tabGas").addEventListener("click", () => setTab("gas"));
+  el("tabAgua").addEventListener("click", () => setTab("agua"));
+
+  // ----------------------------------------------------
+  // SIMULADOR DE GAS
+  // ----------------------------------------------------
+  const gasCanvas = el("gasCanvas");
+  const gctx = gasCanvas.getContext("2d");
+  const gasRect = {x: 60, y: 80, w: 720, h: 360};
+  const gasParticles = [];
+  let gasCollisions = 0;
+  let gasCollisionDisplay = 0;
+  let gasLastCollisionReset = performance.now();
+
+  function gasSpeedFactor(tempC){
+    // Escala cuadrática proporcional a sqrt(T_kelvin)
+    const kelvin = Math.max(1, tempC + 273.15);
+    return Math.sqrt(kelvin / 298.15) * 2.2;
+  }
+
+  function gasAgitationText(tempC){
+    if(tempC < 40) return "Baja";
+    if(tempC < 150) return "Media";
+    if(tempC < 320) return "Alta";
+    return "Muy intensa";
+  }
+
+  function initGas(){
+    gasParticles.length = 0;
+    const count = 30;
+    for(let i = 0; i < count; i++){
+      const angle = Math.random() * Math.PI * 2;
+      gasParticles.push({
+        x: gasRect.x + 25 + Math.random() * (gasRect.w - 50),
+        y: gasRect.y + 25 + Math.random() * (gasRect.h - 50),
+        vx: Math.cos(angle),
+        vy: Math.sin(angle),
+        r: 8.5,
+        trail: []
+      });
+    }
+  }
+
+  function updateGas(dt){
+    const temp = Number(el("gasTemp").value);
+    const factor = gasSpeedFactor(temp);
+    const kelvin = Math.round(temp + 273.15);
+
+    // Actualización de posiciones y colisiones con pared
+    for(let i = 0; i < gasParticles.length; i++){
+      const p = gasParticles[i];
+      p.x += p.vx * factor * dt * 60;
+      p.y += p.vy * factor * dt * 60;
+
+      // Estelas cinéticas
+      p.trail.push({x: p.x, y: p.y});
+      if(p.trail.length > 5) p.trail.shift();
+
+      if(p.x - p.r < gasRect.x){
+        p.x = gasRect.x + p.r;
+        p.vx *= -1;
+        gasCollisions++;
+      } else if(p.x + p.r > gasRect.x + gasRect.w){
+        p.x = gasRect.x + gasRect.w - p.r;
+        p.vx *= -1;
+        gasCollisions++;
+      }
+
+      if(p.y - p.r < gasRect.y){
+        p.y = gasRect.y + p.r;
+        p.vy *= -1;
+        gasCollisions++;
+      } else if(p.y + p.r > gasRect.y + gasRect.h){
+        p.y = gasRect.y + gasRect.h - p.r;
+        p.vy *= -1;
+        gasCollisions++;
+      }
+    }
+
+    // Colisiones simples entre partículas
+    const len = gasParticles.length;
+    for(let i = 0; i < len; i++){
+      for(let j = i + 1; j < len; j++){
+        const p1 = gasParticles[i];
+        const p2 = gasParticles[j];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = p1.r + p2.r;
+        if(dist < minDist && dist > 0){
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const kx = p1.vx - p2.vx;
+          const ky = p1.vy - p2.vy;
+          const p = nx * kx + ny * ky;
+          if(p > 0){
+            p1.vx -= p * nx;
+            p1.vy -= p * ny;
+            p2.vx += p * nx;
+            p2.vy += p * ny;
+          }
+        }
+      }
+    }
+
+    // Frecuencia de choques por segundo
+    const now = performance.now();
+    if(now - gasLastCollisionReset >= 1000){
+      gasCollisionDisplay = gasCollisions;
+      gasCollisions = 0;
+      gasLastCollisionReset = now;
+    }
+
+    // Velocidad rms aprox aire (N2) v = sqrt(3 R T / M)
+    const approxV = Math.round(Math.sqrt((3 * 8.314 * kelvin) / 0.028));
+
+    el("gasTempValue").innerHTML = `${temp} °C <span style="font-size:14px;color:var(--muted);font-weight:500;">(${kelvin} K)</span>`;
+    el("gasAgitation").textContent = gasAgitationText(temp);
+    el("gasCollisions").textContent = `${gasCollisionDisplay} / s`;
+    el("gasSpeedLabel").textContent = `~${approxV} m/s`;
+  }
+
+  function drawGas(){
+    gctx.clearRect(0, 0, gasCanvas.width, gasCanvas.height);
+
+    // Fondo
+    gctx.fillStyle = "#f9fcff";
+    gctx.fillRect(0, 0, gasCanvas.width, gasCanvas.height);
+
+    // Título interno
+    gctx.fillStyle = "#1e3e5c";
+    gctx.font = "bold 20px system-ui, sans-serif";
+    gctx.fillText("Recipiente rígido de volumen constante", 60, 44);
+
+    // Barra de temperatura superior
+    const temp = Number(el("gasTemp").value);
+    const barX = 570, barY = 28, barW = 210, barH = 14;
+    gctx.fillStyle = "#d7e8f7";
+    gctx.fillRect(barX, barY, barW, barH);
+    const fillW = Math.max(4, (temp / 500) * barW);
+    const grad = gctx.createLinearGradient(barX, barY, barX + barW, barY);
+    grad.addColorStop(0, "#4ea3ff");
+    grad.addColorStop(0.4, "#f2c94c");
+    grad.addColorStop(1, "#d94841");
+    gctx.fillStyle = grad;
+    gctx.fillRect(barX, barY, fillW, barH);
+    gctx.strokeStyle = "#9ebed8";
+    gctx.lineWidth = 1.2;
+    gctx.strokeRect(barX, barY, barW, barH);
+    gctx.fillStyle = "#3e6284";
+    gctx.font = "bold 13px system-ui, sans-serif";
+    gctx.fillText(`Termómetro: ${temp} °C`, barX, 20);
+
+    // Contenedor cerrado
+    gctx.fillStyle = "#ffffff";
+    gctx.strokeStyle = "#6b9ec7";
+    gctx.lineWidth = 5;
+    gctx.beginPath();
+    gctx.roundRect(gasRect.x, gasRect.y, gasRect.w, gasRect.h, 14);
+    gctx.fill();
+    gctx.stroke();
+
+    // Dibujo de partículas y estelas
+    const isHot = temp > 220;
+    for(const p of gasParticles){
+      if(p.trail.length > 1){
+        for(let i = 0; i < p.trail.length; i++){
+          const t = p.trail[i];
+          const alpha = ((i + 1) / p.trail.length) * (isHot ? 0.35 : 0.2);
+          gctx.fillStyle = isHot ? `rgba(235, 94, 40, ${alpha})` : `rgba(23, 113, 201, ${alpha})`;
+          gctx.beginPath();
+          gctx.arc(t.x, t.y, p.r * 0.65, 0, Math.PI * 2);
+          gctx.fill();
+        }
+      }
+
+      gctx.fillStyle = isHot ? "#e65100" : "#1976d2";
+      gctx.beginPath();
+      gctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      gctx.fill();
+
+      // Reflejo esférico
+      gctx.strokeStyle = "rgba(255,255,255,.9)";
+      gctx.lineWidth = 1.5;
+      gctx.beginPath();
+      gctx.arc(p.x - p.r * 0.28, p.y - p.r * 0.28, p.r * 0.36, 0, Math.PI * 2);
+      gctx.stroke();
+    }
+
+    // Vectores explicativos inferiores
+    const arrowLen = 20 * gasSpeedFactor(temp);
+    gctx.strokeStyle = "rgba(242, 140, 40, 0.75)";
+    gctx.fillStyle = "rgba(242, 140, 40, 0.85)";
+    gctx.lineWidth = 2.5;
+    for(let i = 0; i < 5; i++){
+      const ax = 90 + i * 145;
+      const ay = 475;
+      drawArrow(gctx, ax, ay, ax + arrowLen, ay);
+    }
+    gctx.fillStyle = "#835f21";
+    gctx.font = "bold 13px system-ui, sans-serif";
+    gctx.fillText("Las flechas ilustran el incremento de la rapidez (sin escala)", 60, 506);
+  }
+
+  // ----------------------------------------------------
+  // SIMULADOR DE AGUA (CAMBIOS DE ESTADO)
+  // ----------------------------------------------------
+  const waterCanvas = el("waterCanvas");
+  const wctx = waterCanvas.getContext("2d");
+  const waterRect = {x: 60, y: 80, w: 720, h: 360};
+
+  const solidParticles = [];
+  const liquidParticles = [];
+  const gasWaterParticles = [];
+
+  function createWaterParticles(){
+    // Usamos una cantidad comparable de partículas en sólido, líquido y vapor.
+    // Es una representación didáctica: no está a escala real.
+    solidParticles.length = 0;
+    const solidCols = 10, solidRows = 7;
+    for(let j = 0; j < solidRows; j++){
+      for(let i = 0; i < solidCols; i++){
+        const bx = 135 + i * 54 + (j % 2) * 14;
+        const by = 125 + j * 38;
+        solidParticles.push({
+          baseX: bx,
+          baseY: by,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          r: 8.8
+        });
+      }
+    }
+
+    // Líquido: mismas partículas, distribuidas por casi todo el recipiente.
+    liquidParticles.length = 0;
+    const liquidCols = 10, liquidRows = 7;
+    for(let j = 0; j < liquidRows; j++){
+      for(let i = 0; i < liquidCols; i++){
+        const bx = 125 + i * 58 + (j % 2) * 8;
+        const by = 150 + j * 32;
+        liquidParticles.push({
+          baseX: bx,
+          baseY: by,
+          x: bx + (Math.random() - 0.5) * 8,
+          y: by + (Math.random() - 0.5) * 8,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.35,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          r: 8.8
+        });
+      }
+    }
+
+    // Vapor: misma cantidad de partículas, más separadas y con trayectorias libres.
+    gasWaterParticles.length = 0;
+    const gasCount = 70;
+    for(let i = 0; i < gasCount; i++){
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.15 + Math.random() * 0.45;
+      gasWaterParticles.push({
+        x: waterRect.x + 20 + Math.random() * (waterRect.w - 40),
+        y: waterRect.y + 20 + Math.random() * (waterRect.h - 40),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: 7.6,
+        trail: []
+      });
+    }
+  }
+
+  function getWaterState(temp){
+    if(temp < 0) return "solid";
+    if(temp === 0) return "melting";
+    if(temp < 100) return "liquid";
+    if(temp === 100) return "boiling";
+    return "gas";
+  }
+
+  function waterStateData(temp){
+    const state = getWaterState(temp);
+    if(state === "melting"){
+      return {name:"Fusión: sólido + líquido", badge:"Fusión (0 °C)", badgeClass:"state-solid",
+        agitation:"En transición", motion:"Vibran y comienzan a deslizarse", observation:"Coexisten hielo y agua líquida"};
+    }
+    if(state === "boiling"){
+      return {name:"Ebullición: líquido + vapor", badge:"Ebullición (100 °C)", badgeClass:"state-gas",
+        agitation:"En transición", motion:"Partículas próximas y separadas", observation:"Coexisten agua líquida y vapor"};
+    }
+    if(state === "solid"){
+      return {
+        name: "Sólido (Hielo)",
+        badge: "Sólido",
+        badgeClass: "state-solid",
+        agitation: temp <= -10 ? "Muy baja" : "Baja",
+        motion: "Vibración en posiciones fijas",
+        observation: "Red cristalina rígida y ordenada"
+      };
+    }
+    if(state === "liquid"){
+      return {
+        name: "Líquido (Agua fluida)",
+        badge: "Líquido",
+        badgeClass: "state-liquid",
+        agitation: temp < 35 ? "Media" : temp < 75 ? "Alta" : "Muy alta",
+        motion: "Fluyen y resbalan entre sí",
+        observation: "Próximas, móviles y distribuidas en el recipiente"
+      };
+    }
+    return {
+      name: "Gaseoso (Vapor de agua)",
+      badge: "Vapor",
+      badgeClass: "state-gas",
+      agitation: temp >= 300 ? "Muy intensa" : "Alta",
+      motion: "Traslación libre y caótica",
+      observation: "Moléculas muy separadas"
+    };
+  }
+
+  function updateWater(dt){
+    const temp = Number(el("waterTemp").value);
+    const state = getWaterState(temp);
+    const data = waterStateData(temp);
+
+    el("waterTempValue").textContent = `${temp} °C`;
+    el("waterStateText").textContent = data.name;
+    el("waterAgitation").textContent = data.agitation;
+    el("waterMotion").textContent = data.motion;
+    el("waterObservation").textContent = data.observation;
+
+    const badge = el("waterStateBadge");
+    badge.textContent = data.badge;
+    badge.className = "pill " + data.badgeClass;
+
+    // Solo calculamos la física de la fase activa para máxima eficiencia
+    if(state === "liquid" || state === "melting" || state === "boiling"){
+      const heat = Math.max(0, temp);
+      const liquidFactor = 0.55 + (Math.min(100, heat) / 100) * 1.35;
+      const roamX = 3.5 + Math.min(100, heat) * 0.11;
+      const roamY = 2.5 + Math.min(100, heat) * 0.06;
+      const randomKick = 0.014 + Math.min(100, heat) * 0.00035;
+      const spring = heat >= 50 ? 0.028 : 0.022;
+      const damping = 0.965;
+      const tNow = performance.now() / 1000;
+
+      for(const p of liquidParticles){
+        const targetX = p.baseX + Math.sin(tNow * (1.3 + liquidFactor * 0.35) + p.phaseX) * roamX;
+        const targetY = p.baseY + Math.cos(tNow * (1.1 + liquidFactor * 0.30) + p.phaseY) * roamY;
+
+        p.vx += (targetX - p.x) * spring + (Math.random() - 0.5) * randomKick;
+        p.vy += (targetY - p.y) * spring + (Math.random() - 0.5) * randomKick;
+
+        const maxV = 0.65 + liquidFactor * 0.95;
+        p.vx = Math.max(-maxV, Math.min(maxV, p.vx)) * damping;
+        p.vy = Math.max(-maxV, Math.min(maxV, p.vy)) * damping;
+
+        p.x += p.vx * dt * 60;
+        p.y += p.vy * dt * 60;
+
+        // Contención del líquido en casi todo el recipiente
+        if(p.x - p.r < 90){ p.x = 90 + p.r; p.vx *= -0.6; }
+        if(p.x + p.r > 750){ p.x = 750 - p.r; p.vx *= -0.6; }
+        if(p.y - p.r < 110){ p.y = 110 + p.r; p.vy *= -0.6; }
+        if(p.y + p.r > 420){ p.y = 420 - p.r; p.vy *= -0.6; }
+      }
+
+      // Repulsión local reforzada: evita la aglomeración, sobre todo por encima de 50 °C.
+      const extraSep = heat >= 50 ? 3.6 : 1.8;
+      for(let i = 0; i < liquidParticles.length; i++){
+        for(let j = i + 1; j < liquidParticles.length; j++){
+          const p = liquidParticles[i], q = liquidParticles[j];
+          let dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+          const sep = p.r + q.r + extraSep;
+          if(d < sep){
+            if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+            const push = (sep - d) * 0.52;
+            const nx = dx / d, ny = dy / d;
+            p.x -= nx * push; p.y -= ny * push;
+            q.x += nx * push; q.y += ny * push;
+          }
+        }
+      }
+    }
+    if(state === "gas" || state === "boiling"){
+      // La rapidez promedio del gas ideal crece proporcionalmente a sqrt(T en K).
+      const gasFactor = 1.0 * Math.sqrt((temp + 273.15) / 373.15);
+      for(const p of gasWaterParticles){
+        p.x += p.vx * gasFactor * dt * 60;
+        p.y += p.vy * gasFactor * dt * 60;
+
+        p.trail.push({x: p.x, y: p.y});
+        if(p.trail.length > 5) p.trail.shift();
+
+        if(p.x - p.r < waterRect.x){ p.x = waterRect.x + p.r; p.vx *= -1; }
+        if(p.x + p.r > waterRect.x + waterRect.w){ p.x = waterRect.x + waterRect.w - p.r; p.vx *= -1; }
+        if(p.y - p.r < waterRect.y){ p.y = waterRect.y + p.r; p.vy *= -1; }
+        if(p.y + p.r > waterRect.y + waterRect.h){ p.y = waterRect.y + waterRect.h - p.r; p.vy *= -1; }
+      }
+    }
+  }
+
+  function drawWater(){
+    wctx.clearRect(0, 0, waterCanvas.width, waterCanvas.height);
+    wctx.fillStyle = "#f9fcff";
+    wctx.fillRect(0, 0, waterCanvas.width, waterCanvas.height);
+
+    const temp = Number(el("waterTemp").value);
+    const state = getWaterState(temp);
+    const data = waterStateData(temp);
+
+    // Título y estado
+    wctx.fillStyle = "#1e3e5c";
+    wctx.font = "bold 20px system-ui, sans-serif";
+    wctx.fillText(`Partículas de H₂O: ${data.name}`, 60, 44);
+
+    // Termómetro superior
+    const barX = 570, barY = 28, barW = 210, barH = 14;
+    wctx.fillStyle = "#d7e8f7";
+    wctx.fillRect(barX, barY, barW, barH);
+    const norm = Math.max(0, Math.min(1, (temp + 20) / 520));
+    const fillW = Math.max(4, norm * barW);
+    const grad = wctx.createLinearGradient(barX, barY, barX + barW, barY);
+    grad.addColorStop(0, "#4ea3ff");
+    grad.addColorStop(0.35, "#2eb872");
+    grad.addColorStop(1, "#d94841");
+    wctx.fillStyle = grad;
+    wctx.fillRect(barX, barY, fillW, barH);
+    wctx.strokeStyle = "#9ebed8";
+    wctx.lineWidth = 1.2;
+    wctx.strokeRect(barX, barY, barW, barH);
+    wctx.fillStyle = "#3e6284";
+    wctx.font = "bold 13px system-ui, sans-serif";
+    wctx.fillText(`Temperatura: ${temp} °C`, barX, 20);
+
+    // Contenedor
+    wctx.fillStyle = "#ffffff";
+    wctx.strokeStyle = "#6b9ec7";
+    wctx.lineWidth = 5;
+    wctx.beginPath();
+    wctx.roundRect(waterRect.x, waterRect.y, waterRect.w, waterRect.h, 14);
+    wctx.fill();
+    wctx.stroke();
+
+    if(state === "solid" || state === "melting"){
+      // Hielo: Bloque azulado y vibración alrededor de nodos fijos
+      wctx.fillStyle = "rgba(78, 163, 255, 0.08)";
+      wctx.fillRect(110, 110, 620, 270);
+
+      // Amplitud de vibración térmica
+      const amp = 1.2 + (Math.max(0, temp + 20) / 20) * 3.8;
+      const time = performance.now() / 150;
+
+      for(const [index,p] of solidParticles.entries()){
+        if(state === "melting" && index % 2 === 0) continue;
+        const x = p.baseX + Math.cos(time + p.phaseX) * amp;
+        const y = p.baseY + Math.sin(time + p.phaseY) * amp;
+
+        // Marcadores de vibración elástica
+        wctx.strokeStyle = "rgba(78, 163, 255, 0.4)";
+        wctx.lineWidth = 1.5;
+        wctx.beginPath();
+        wctx.moveTo(x - amp - 2, y);
+        wctx.lineTo(x + amp + 2, y);
+        wctx.moveTo(x, y - amp - 2);
+        wctx.lineTo(x, y + amp + 2);
+        wctx.stroke();
+
+        wctx.fillStyle = "#3b82f6";
+        wctx.beginPath();
+        wctx.arc(x, y, p.r, 0, Math.PI * 2);
+        wctx.fill();
+
+        wctx.strokeStyle = "rgba(255,255,255,.9)";
+        wctx.lineWidth = 1.3;
+        wctx.beginPath();
+        wctx.arc(x - 2.5, y - 2.5, 3.2, 0, Math.PI * 2);
+        wctx.stroke();
+      }
+
+      wctx.fillStyle = "#25537d";
+      wctx.font = "bold 14px system-ui, sans-serif";
+      wctx.fillText(state === "melting" ? "A 0 °C: pueden coexistir hielo y agua líquida." : "Sólido: vibración alrededor de posiciones de equilibrio.", 80, 485);
+    }
+    if(state === "liquid" || state === "melting" || state === "boiling"){
+      // Líquido: fluido cohesionado con ondas superficiales
+      const level = state === "liquid" ? 98 : state === "melting" ? 250 : 255;
+      wctx.fillStyle = "rgba(39, 167, 111, 0.07)";
+      if(state === "liquid") wctx.fillRect(70, level, 700, 435 - level);
+
+      wctx.strokeStyle = "rgba(39, 167, 111, 0.4)";
+      wctx.lineWidth = 2;
+      wctx.beginPath();
+      wctx.moveTo(70, level);
+      const waveT = performance.now() / 250;
+      for(let x = 70; x <= 770; x += 15){
+        wctx.lineTo(x, level + Math.sin((x / 25) + waveT) * 2.5);
+      }
+      wctx.stroke();
+
+      for(const [index,p] of liquidParticles.entries()){
+        if(state === "melting" && index % 4 !== 0) continue;
+        if(state === "boiling" && (index % 4 !== 0 || p.y < 255)) continue;
+        wctx.fillStyle = "#10b981";
+        wctx.beginPath();
+        wctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        wctx.fill();
+
+        wctx.strokeStyle = "rgba(255,255,255,.85)";
+        wctx.lineWidth = 1.2;
+        wctx.beginPath();
+        wctx.arc(p.x - 2.2, p.y - 2.2, 3.2, 0, Math.PI * 2);
+        wctx.stroke();
+      }
+
+      wctx.fillStyle = "#1e5c3e";
+      wctx.font = "bold 14px system-ui, sans-serif";
+      wctx.fillText(state === "boiling" ? "A 100 °C: pueden coexistir agua líquida y vapor." : state === "melting" ? "Fusión: parte de las moléculas se deslizan mientras otras permanecen en el hielo." : "Líquido: moléculas próximas que se desplazan unas respecto de otras.", 80, 485);
+    }
+    if(state === "gas" || state === "boiling"){
+      // Vapor: partículas libres, veloces con estelas
+      for(const [index,p] of gasWaterParticles.entries()){
+        if(state === "boiling" && index % 2 === 0) continue;
+        for(let i = 0; i < p.trail.length; i++){
+          const t = p.trail[i];
+          const alpha = ((i + 1) / p.trail.length) * 0.25;
+          wctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
+          wctx.beginPath();
+          wctx.arc(t.x, t.y, p.r * 0.65, 0, Math.PI * 2);
+          wctx.fill();
+        }
+
+        wctx.fillStyle = "#ef4444";
+        wctx.beginPath();
+        wctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        wctx.fill();
+
+        wctx.strokeStyle = "rgba(255,255,255,.85)";
+        wctx.lineWidth = 1.3;
+        wctx.beginPath();
+        wctx.arc(p.x - 2, p.y - 2, 3, 0, Math.PI * 2);
+        wctx.stroke();
+      }
+
+      wctx.fillStyle = "#991b1b";
+      wctx.font = "bold 14px system-ui, sans-serif";
+      if(state === "gas") wctx.fillText("Vapor: moléculas alejadas, con movimiento libre entre choques.", 80, 485);
+    }
+  }
+
+  function drawArrow(ctx, x1, y1, x2, y2){
+    const head = 8;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ----------------------------------------------------
+  // EVENTOS Y CONTROLES
+  // ----------------------------------------------------
+  function syncPresetButtons(group, val){
+    document.querySelectorAll(`[data-${group}]`).forEach(btn => {
+      btn.classList.toggle("active-preset", Number(btn.dataset[group]) === Number(val));
+    });
+  }
+
+  el("gasTemp").addEventListener("input", (e) => {
+    syncPresetButtons("gas", e.target.value);
+  });
+
+  el("waterTemp").addEventListener("input", (e) => {
+    syncPresetButtons("water", e.target.value);
+  });
+
+  document.querySelectorAll("[data-gas]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      el("gasTemp").value = btn.dataset.gas;
+      syncPresetButtons("gas", btn.dataset.gas);
+    });
+  });
+
+  document.querySelectorAll("[data-water]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      el("waterTemp").value = btn.dataset.water;
+      syncPresetButtons("water", btn.dataset.water);
+    });
+  });
+
+  // ----------------------------------------------------
+  // BUCLE PRINCIPAL DE ANIMACIÓN
+  // ----------------------------------------------------
+  let last = performance.now();
+
+  function animate(now){
+    const dt = Math.min(0.03, (now - last) / 1000);
+    last = now;
+
+    if(activeTab === "gas"){
+      updateGas(dt);
+      drawGas();
+    } else {
+      updateWater(dt);
+      drawWater();
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  initGas();
+  createWaterParticles();
+  setTab("gas");
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
