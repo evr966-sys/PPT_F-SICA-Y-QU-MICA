@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiempo de encuentro en un MRUV</title>
+<style>
+  :root {
+    --navy: #0f2942;
+    --muted: #4a6785;
+    --border: #d5e3f0;
+    --surface: #ffffff;
+    --surface-alt: #f6f9fd;
+    --page: #ffffff;
+    --blue: #1f6fd1;
+    --red: #d62828;
+    --pink: #e6007e;
+    --green: #0b8744;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(15,41,66,.05), 0 4px 14px rgba(15,41,66,.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px; background: var(--page); color: var(--navy);
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+    font-size: 15px; line-height: 1.45;
+  }
+  .wrap { max-width: 1480px; margin: 0 auto; display: grid; gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; }
+  h1 { margin: 0 0 4px; font-size: clamp(19px, 2.2vw, 24px); letter-spacing: -.01em; }
+  .subtitle { margin: 0; color: var(--muted); font-size: 14px; }
+  h2 { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 315px; gap: 14px; align-items: start; }
+  .stage-main { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; align-content: start; }
+  .stage-main > .card:first-child { padding: 12px; }
+  .side { display: grid; gap: 12px; position: sticky; top: 12px; }
+  .scene-wrap { border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; background: #fff; }
+  .scene { display: block; width: 100%; height: auto; min-width: 700px; }
+  .scene text { font-family: 'Segoe UI', system-ui, Arial, sans-serif; paint-order: stroke fill; stroke: #fff; stroke-width: 4px; stroke-linejoin: round; }
+  .scene text.raw { stroke: none; paint-order: normal; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 13px; font-weight: 600; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .row { margin-bottom: 10px; }
+  .row-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 600; }
+  output { font-weight: 700; color: var(--blue); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; margin: 3px 0 0; accent-color: var(--blue); cursor: pointer; }
+  select { width: 100%; padding: 6px 8px; border: 1px solid #b8cfe4; border-radius: 7px; font: inherit; font-size: 14px; background: #fff; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  button { font: inherit; font-weight: 700; font-size: 14px; padding: 8px 6px; border-radius: 8px; border: 1px solid transparent; background: var(--blue); color: #fff; cursor: pointer; }
+  button:hover { filter: brightness(.92); }
+  button.secondary { background: #fff; color: var(--navy); border-color: #b8cfe4; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #7fb8ff; outline-offset: 2px; }
+
+  .status { display: block; margin-top: 10px; text-align: center; font-size: 13px; font-weight: 700; color: #8a4b00; background: #fff6e5; border: 1px solid #f3d08e; border-radius: 999px; padding: 5px 10px; }
+
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric { border: 1px solid var(--border); border-radius: 9px; padding: 8px; background: var(--surface-alt); text-align: center; }
+  .metric small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .metric strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+
+  .result { border-left: 4px solid var(--pink); background: #fff5fa; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+  .result p { margin: 3px 0; font-size: 14px; }
+  .formulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+  .formula { background: var(--surface-alt); border: 1px solid var(--border); border-left: 4px solid var(--blue); border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 600; }
+  .note { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin: 6px 0; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; margin: 0; }
+  button:disabled { cursor: not-allowed; opacity: .48; }
+  .captionMini { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  .result:not(.revealed) { border-left-color: #acb9c9; background: #f6f9fd; }
+  .result:not(.revealed) #solutionHint { display: block; }
+  #solutionHint { display: none; }
+  @media (max-width: 940px) { .scene-wrap { scrollbar-width: thin; } }
+
+
+  @media (max-width: 1060px) {
+    .stage { grid-template-columns: 1fr; }
+    .side { position: static; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="card">
+    <h1>Tiempo de encuentro en un MRUV</h1>
+    <p class="subtitle">
+      Dos móviles parten del reposo desde extremos opuestos de una distancia <b>d</b> y se mueven uno hacia el otro
+      con aceleración constante. Compara las <b>distancias recorridas</b>, las <b>posiciones</b> y los vectores de velocidad y aceleración. El eje +x apunta hacia la derecha.
+    </p>
+  </header>
+
+  <div class="stage">
+    <div class="stage-main">
+      <section class="card" aria-label="Animación del encuentro">
+      <div class="scene-wrap">
+        <svg id="scene" class="scene" viewBox="0 0 900 360" role="img" aria-label="Animación de dos móviles con velocidad, desplazamiento y línea del tiempo">
+          <defs>
+            <marker id="arrBlue" viewBox="0 0 12 12" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1.5 L11 6 L1 10.5 L3 6 Z" fill="#1f6fd1"/>
+            </marker>
+            <marker id="arrRed" viewBox="0 0 12 12" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1.5 L11 6 L1 10.5 L3 6 Z" fill="#d62828"/>
+            </marker>
+            <marker id="arrVBlue" viewBox="0 0 12 12" markerWidth="11" markerHeight="11" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1 L11 6 L1 11 Z" fill="#0b5fb8"/>
+            </marker>
+            <marker id="arrVRed" viewBox="0 0 12 12" markerWidth="11" markerHeight="11" refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1 L11 6 L1 11 Z" fill="#a51d1d"/>
+            </marker>
+            <marker id="arrPink" viewBox="0 0 12 12" markerWidth="10" markerHeight="10" refX="8" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 2 L10 6 L1 10 Z" fill="#e6007e"/>
+            </marker>
+            <marker id="arrDim" viewBox="0 0 10 10" markerWidth="9" markerHeight="9" refX="5" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0 0 L10 5 L0 10 Z" fill="#0b8744"/>
+            </marker>
+            <marker id="arrDimStart" viewBox="0 0 10 10" markerWidth="9" markerHeight="9" refX="5" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+              <path d="M0 0 L10 5 L0 10 Z" fill="#0b8744"/>
+            </marker>
+          </defs>
+
+          <!-- Arcos de tiempo transcurrido desde cada punto de partida -->
+          <path id="arcLeft" fill="none" stroke="#e6007e" stroke-width="3" stroke-linecap="round" marker-end="url(#arrPink)"/>
+          <path id="arcRight" fill="none" stroke="#e6007e" stroke-width="3" stroke-linecap="round" marker-end="url(#arrPink)"/>
+          <text id="arcLeftLabel" text-anchor="middle" font-size="19" font-weight="700" fill="#e6007e" class="raw">t<tspan dy="4" font-size="13">e</tspan></text>
+          <text id="arcRightLabel" text-anchor="middle" font-size="19" font-weight="700" fill="#e6007e" class="raw">t<tspan dy="4" font-size="13">e</tspan></text>
+
+          <!-- Carretera -->
+          <rect x="0" y="214" width="900" height="76" fill="#d9dde3"/>
+          <line x1="0" y1="214" x2="900" y2="214" stroke="#4b5563" stroke-width="3"/>
+          <line x1="0" y1="250" x2="900" y2="250" stroke="#ffffff" stroke-width="3" stroke-dasharray="18 14" opacity=".8"/>
+
+          <!-- Línea de encuentro -->
+          <line id="meetLine" x1="0" y1="104" x2="0" y2="214" stroke="#0f2942" stroke-width="2" stroke-dasharray="6 5"/>
+          <text id="meetLabel" x="0" y="85" text-anchor="middle" font-size="15" font-weight="700" fill="#0f2942">Encuentro</text>
+
+          <!-- Desplazamientos de cada móvil (color de cada auto) -->
+          <line id="disp1" x1="130" y1="238" x2="130" y2="238" stroke="#1f6fd1" stroke-width="8" stroke-linecap="round"/>
+          <line id="disp2" x1="770" y1="238" x2="770" y2="238" stroke="#d62828" stroke-width="8" stroke-linecap="round"/>
+          <text id="disp1Label" x="130" y="257" text-anchor="middle" font-size="15" font-weight="700" fill="#1f6fd1">s₁ = 0 m</text>
+          <text id="disp2Label" x="770" y="257" text-anchor="middle" font-size="15" font-weight="700" fill="#d62828">s₂ = 0 m</text>
+
+          <!-- Dimensión d -->
+          <line id="dimLine" x1="130" y1="280" x2="770" y2="280" stroke="#0b8744" stroke-width="2.5" marker-start="url(#arrDimStart)" marker-end="url(#arrDim)"/>
+          <text id="dimLabel" x="450" y="300" text-anchor="middle" font-size="18" font-weight="700" fill="#0b8744">d</text>
+
+          <!-- Móviles y estelas -->
+          <g id="cars"></g>
+          <text id="x0Label1" x="88" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="#1f6fd1" class="raw">x₀₁ = 0 m</text>
+          <text id="x0Label2" x="812" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="#d62828" class="raw">x₀₂ = d</text>
+
+          <!-- Vectores de aceleración y velocidad -->
+          <g id="vectors"></g>
+
+          <!-- Línea del tiempo: 0 a t_e -->
+          <line x1="130" y1="330" x2="770" y2="330" stroke="#9aa9ba" stroke-width="4" stroke-linecap="round"/>
+          <line id="timeProgress" x1="130" y1="330" x2="130" y2="330" stroke="#e6007e" stroke-width="6" stroke-linecap="round"/>
+          <g id="timeTicks"></g>
+          <circle id="timeMarker" cx="130" cy="330" r="8" fill="#e6007e" stroke="#fff" stroke-width="2.5"/>
+          <text id="timeMarkerLabel" x="130" y="314" text-anchor="middle" font-size="14" font-weight="700" fill="#b0005c" class="raw">t = 0 s</text>
+          <text x="60" y="335" font-size="14" font-weight="700" fill="#4a6785" class="raw">t (s)</text>
+          <text id="timeEndLabel" x="770" y="354" text-anchor="middle" font-size="14" font-weight="700" fill="#b0005c" class="raw">tₑ</text>
+        </svg>
+      </div>
+      <div class="legend" aria-label="Convención de colores">
+        <span><i class="sw" style="background:#1f6fd1"></i>Auto 1 (azul): a₁ hacia +x, v₁, s₁</span>
+        <span><i class="sw" style="background:#d62828"></i>Auto 2 (rojo): a₂ hacia −x, v₂, s₂</span>
+        <span><i class="sw" style="background:rgba(31,111,209,.3);border:1px dashed #1f6fd1"></i>Posición inicial</span>
+        <span><i class="sw" style="background:#e6007e"></i>Tiempo transcurrido t (dos arcos)</span>
+        <span><i class="sw" style="background:#0b8744"></i>Distancia d</span>
+      </div>
+      <p class="note">
+        Las flechas de aceleración y de velocidad tienen longitud proporcional a su valor. La rapidez aumenta con el tiempo y cada barra representa la <b>distancia recorrida</b> desde su punto de partida. En las lecturas, la velocidad del auto rojo es negativa porque se desplaza en el sentido −x.
+      </p>
+    </section>
+
+  <section class="card" aria-label="Fórmulas">
+    <h2>Fórmulas (partiendo del reposo, v₀ = 0)</h2>
+    <div class="formulas">
+      <div class="formula">s₁(t) = ½ a₁ t²</div>
+      <div class="formula">s₂(t) = ½ a₂ t²</div>
+      <div class="formula">v₁(t) = +a₁t,&nbsp; v₂(t) = −a₂t</div>
+      <div class="formula">tₑ = √( 2d / (a₁ + a₂) )</div>
+      <div class="formula">xₑ = d · a₁ / (a₁ + a₂)</div>
+      <div class="formula">Posiciones: x₁ = s₁, &nbsp;x₂ = d − s₂</div>
+      <div class="formula">Encuentro: s₁ + s₂ = d &nbsp;⇔&nbsp; x₁ = x₂</div>
+    </div>
+    <p class="note">
+      Aquí a₁ y a₂ son <b>magnitudes positivas</b> de aceleraciones dirigidas hacia el encuentro. Las distancias s₁ y s₂ también son positivas;
+      las coordenadas x₁ y x₂ se miden desde el origen del auto azul, con +x hacia la derecha.
+      <b>El encuentro ocurre más cerca del punto de partida del móvil con menor aceleración</b>, pues recorre menos distancia en el mismo tiempo.
+    </p>
+  </section>
+    </div>
+
+    <aside class="side">
+      <section class="card" aria-label="Datos del problema">
+        <h2>Datos</h2>
+        <div class="row">
+          <div class="row-head"><label for="dIn">Distancia d</label><output id="dOut">100 m</output></div>
+          <input id="dIn" type="range" min="20" max="200" step="1" value="100">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="a1In" style="color:var(--blue)">Magnitud de a₁ (azul, hacia +x)</label><output id="a1Out">2,0 m/s²</output></div>
+          <input id="a1In" type="range" min="0.5" max="6" step="0.1" value="2">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="a2In" style="color:var(--red)">Magnitud de a₂ (roja, hacia −x)</label><output id="a2Out">3,0 m/s²</output></div>
+          <input id="a2In" type="range" min="0.5" max="6" step="0.1" value="3">
+        </div>
+        <div class="row">
+          <label for="speedIn">Velocidad de la animación</label>
+          <select id="speedIn">
+            <option value="0.5">0,5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="playBtn" type="button">Iniciar ▶</button>
+          <button id="resetBtn" type="button" class="secondary">Reiniciar</button>
+          <button id="stepBtn" type="button" class="secondary">+0,1 s</button>
+        </div>
+        <span id="status" class="status" aria-live="polite">Listos en el reposo</span>
+      </section>
+
+      <section class="card" aria-label="Opciones de visualización">
+        <h2>Mostrar valores en la animación</h2>
+        <label class="chk"><input id="chkV" type="checkbox" checked> Vectores de velocidad v₁, v₂</label>
+        <label class="chk"><input id="chkA" type="checkbox" checked> Vectores de aceleración a₁, a₂</label>
+        <label class="chk"><input id="chkX" type="checkbox" checked> Distancias recorridas s₁ y s₂</label>
+        <label class="chk"><input id="chkX0" type="checkbox" checked> Posiciones iniciales</label>
+        <label class="chk"><input id="chkSolution" type="checkbox"> Mostrar solución y punto de encuentro</label>
+        <p class="captionMini">La solución también se revela automáticamente al encontrarse los autos.</p>
+      </section>
+
+      <section class="card" aria-label="Lecturas">
+        <h2>Lecturas en t</h2>
+        <div class="metrics">
+          <div class="metric"><small>Tiempo t</small><strong id="rT">0,00 s</strong></div>
+          <div class="metric"><small>Distancia restante</small><strong id="rGap">100,00 m</strong></div>
+          <div class="metric"><small>Distancia azul s₁</small><strong id="rX1" style="color:var(--blue)">0,00 m</strong></div>
+          <div class="metric"><small>Distancia roja s₂</small><strong id="rX2" style="color:var(--red)">0,00 m</strong></div>
+          <div class="metric"><small>Posición azul x₁</small><strong id="rC1" style="color:var(--blue)">0,00 m</strong></div>
+          <div class="metric"><small>Posición roja x₂</small><strong id="rC2" style="color:var(--red)">100,00 m</strong></div>
+          <div class="metric"><small>Velocidad v₁</small><strong id="rV1" style="color:var(--blue)">+0,00 m/s</strong></div>
+          <div class="metric"><small>Velocidad v₂</small><strong id="rV2" style="color:var(--red)">−0,00 m/s</strong></div>
+        </div>
+
+        <div id="result" class="result" aria-label="Resultado del encuentro">
+          <p id="solutionHint">Predice el encuentro. Marca «Mostrar solución» o espera a que lleguen.</p>
+          <p><b>Tiempo de encuentro:</b> <span id="rTe">—</span></p>
+          <p><b>Posición de encuentro:</b> <span id="rXe">—</span> desde el auto azul</p>
+          <p><b>Velocidades al encontrarse:</b> <span id="rVe">—</span></p>
+          <p><b>Comprobación:</b> <span id="rCheck">—</span></p>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const L0 = 130, R0 = 770, ROAD = 214, W = 84, SPAN = R0 - L0;
+  const ACC_K = 17;     // píxeles por m/s²; flecha de aceleración (módulo)
+  const VEL_K = 2.4;    // píxeles por m/s; flecha de velocidad (módulo)
+  const MIN_ARROW = 9;  // evita representar una magnitud casi nula con una punta desproporcionada
+
+  let t = 0, running = false, last = null;
+  const f = (n, d = 2) => (Math.abs(n) < 1e-10 ? 0 : n).toFixed(d).replace('.', ',');
+  const fs = (n, d = 2) => (n < -1e-10 ? '−' : n > 1e-10 ? '+' : '') + f(Math.abs(n), d);
+  const vis = (id, yes) => $(id).setAttribute('visibility', yes ? 'visible' : 'hidden');
+
+  // El parámetro fx es la posición del parachoques delantero sobre el eje x.
+  function car(fx, dir, color, opacity = 1) {
+    const cx = fx - dir * W / 2, y0 = ROAD - 34;
+    const frontLight = cx + dir * (W / 2 - 4), rearLight = cx - dir * (W / 2 - 4);
+    return `<g opacity="${opacity}">
+      <rect x="${cx-W/2}" y="${y0}" width="${W}" height="26" rx="9" fill="${color}"/>
+      <path d="M${cx-24} ${y0} L${cx-14} ${y0-17} L${cx+18} ${y0-17} L${cx+30} ${y0} Z" fill="${color}"/>
+      <path d="M${cx-20} ${y0-1} L${cx-12} ${y0-13} L${cx+2} ${y0-13} L${cx+2} ${y0-1} Z" fill="#dff1ff" opacity=".9"/>
+      <path d="M${cx+6} ${y0-1} L${cx+6} ${y0-13} L${cx+16} ${y0-13} L${cx+25} ${y0-1} Z" fill="#dff1ff" opacity=".9"/>
+      <circle cx="${frontLight}" cy="${y0+9}" r="3" fill="#fff7c2"/>
+      <circle cx="${rearLight}" cy="${y0+9}" r="3" fill="#ff8a8a"/>
+      <circle cx="${cx-24}" cy="${y0+26}" r="9" fill="#1b2b3c"/>
+      <circle cx="${cx-24}" cy="${y0+26}" r="3.5" fill="#9aa5b1"/>
+      <circle cx="${cx+24}" cy="${y0+26}" r="9" fill="#1b2b3c"/>
+      <circle cx="${cx+24}" cy="${y0+26}" r="3.5" fill="#9aa5b1"/>
+    </g>`;
+  }
+
+  function arrow(x, y, len, dir, color, marker, sw=4) {
+    if (len < MIN_ARROW) return '';
+    return `<line x1="${x}" y1="${y}" x2="${x+dir*len}" y2="${y}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+  }
+
+  function ticks(te) {
+    const step = te > 8 ? 2 : te > 4 ? 1 : te > 2 ? .5 : .25;
+    let s = '';
+    for (let k=0; k*step < te-1e-9; k++) {
+      const tk = k*step, x=L0+SPAN*tk/te;
+      s += `<line x1="${x}" y1="324" x2="${x}" y2="336" stroke="#4a6785" stroke-width="1.7"/>`;
+      s += `<text x="${x}" y="350" text-anchor="middle" font-size="13" font-weight="700" fill="#4a6785" class="raw">${f(tk,tk%1?1:0)}</text>`;
+    }
+    return s;
+  }
+
+  function physics() {
+    const d=+$('dIn').value, a1=+$('a1In').value, a2=+$('a2In').value;
+    const te=Math.sqrt(2*d/(a1+a2)), tc=Math.min(t,te), sc=SPAN/d;
+    const s1=.5*a1*tc*tc, s2=.5*a2*tc*tc;
+    const x1=s1, x2=d-s2, v1=+a1*tc, v2=-a2*tc;
+    const front1=L0+x1*sc, front2=L0+x2*sc;
+    const se=a1*d/(a1+a2);
+    return {d,a1,a2,te,tc,sc,s1,s2,x1,x2,v1,v2,front1,front2,se,
+      meetPx:L0+se*sc, done:tc>=te-1e-9};
+  }
+
+  function render() {
+    const s=physics();
+    const {d,a1,a2,te,tc,sc,s1,s2,x1,x2,v1,v2,front1,front2,se,meetPx,done}=s;
+    const showSol= $('chkSolution').checked || done;
+    const showV=$('chkV').checked, showA=$('chkA').checked;
+    const showS=$('chkX').checked, showStarts=$('chkX0').checked;
+
+    $('dOut').textContent=f(d,0)+' m';
+    $('a1Out').textContent=f(a1,1)+' m/s²';
+    $('a2Out').textContent=f(a2,1)+' m/s²';
+
+    // Punto de encuentro: oculto antes de revelarlo o llegar a él.
+    $('meetLine').setAttribute('x1',meetPx);
+    $('meetLine').setAttribute('x2',meetPx);
+    $('meetLabel').setAttribute('x',meetPx);
+    vis('meetLine',showSol); vis('meetLabel',showSol);
+
+    // Dos arcos indican el MISMO tiempo transcurrido para los dos móviles.
+    const leftTravel=front1-L0, rightTravel=R0-front2;
+    const drawL=leftTravel>38,drawR=rightTravel>38;
+    $('arcLeft').setAttribute('d',drawL?`M${L0} 112 Q${(L0+front1)/2} 18 ${front1-2} 112`:'');
+    $('arcRight').setAttribute('d',drawR?`M${R0} 112 Q${(R0+front2)/2} 18 ${front2+2} 112`:'');
+    const arcText=done?`tₑ = ${f(te)} s`:`t = ${f(tc)} s`;
+    $('arcLeftLabel').setAttribute('x',(L0+front1)/2);
+    $('arcRightLabel').setAttribute('x',(R0+front2)/2);
+    $('arcLeftLabel').setAttribute('y',55);
+    $('arcRightLabel').setAttribute('y',55);
+    $('arcLeftLabel').textContent=arcText;
+    $('arcRightLabel').textContent=arcText;
+    vis('arcLeft',drawL);vis('arcRight',drawR);
+    vis('arcLeftLabel',drawL);vis('arcRightLabel',drawR);
+
+    // Distancias, positivas desde cada punto de partida.
+    $('disp1').setAttribute('x1',L0);$('disp1').setAttribute('x2',front1);
+    $('disp2').setAttribute('x1',R0);$('disp2').setAttribute('x2',front2);
+    $('disp1Label').setAttribute('x',(L0+front1)/2);
+    $('disp2Label').setAttribute('x',(R0+front2)/2);
+    $('disp1Label').textContent=`s₁ = ${f(s1,1)} m`;
+    $('disp2Label').textContent=`s₂ = ${f(s2,1)} m`;
+    for(const id of ['disp1','disp2','disp1Label','disp2Label'])vis(id,showS);
+
+    // Posiciones iniciales en un solo sistema de referencia: x₀₁=0, x₀₂=d.
+    $('x0Label2').textContent=`x₀₂ = ${f(d,0)} m`;
+    vis('x0Label1',showStarts);vis('x0Label2',showStarts);
+    let cars='';
+    if(showStarts && tc>0.03){
+      cars += car(L0,+1,'#1f6fd1',.22)+car(R0,-1,'#d62828',.22);
+    }
+    // Se mantienen solo las posiciones iniciales tenues, sin estelas adicionales.
+    cars += car(front1,+1,'#1f6fd1')+car(front2,-1,'#d62828');
+    $('cars').innerHTML=cars;
+
+    // Vectores: cada flecha sigue a su vehículo, +x hacia la derecha.
+    const center1=front1-W/2, center2=front2+W/2;
+    const aLen1=a1*ACC_K,aLen2=a2*ACC_K;
+    const vLen1=Math.abs(v1)*VEL_K,vLen2=Math.abs(v2)*VEL_K;
+    let arrows='';
+    if(showA){
+      arrows+=arrow(center1-20,132,aLen1,+1,'#1f6fd1','arrBlue');
+      arrows+=arrow(center2+20,132,aLen2,-1,'#d62828','arrRed');
+      arrows+=`<text x="${center1-20+aLen1/2}" y="119" text-anchor="middle" font-size="15" font-weight="700" fill="#1f6fd1" class="raw">a₁</text>`;
+      arrows+=`<text x="${center2+20-aLen2/2}" y="119" text-anchor="middle" font-size="15" font-weight="700" fill="#d62828" class="raw">a₂</text>`;
+    }
+    if(showV){
+      // Cerca del encuentro, usar etiquetas cortas para evitar superposición.
+      const nearMeet=(center2-center1)<240;
+      const v1Label=nearMeet?'v₁':`v₁=${fs(v1,1)} m/s`;
+      const v2Label=nearMeet?'v₂':`v₂=${fs(v2,1)} m/s`;
+      arrows+=arrow(center1-20,157,vLen1,+1,'#0b5fb8','arrVBlue',5);
+      arrows+=arrow(center2+20,157,vLen2,-1,'#a51d1d','arrVRed',5);
+      if(vLen1>=MIN_ARROW)
+        arrows+=`<text x="${center1-20+vLen1/2}" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="#0b5fb8" class="raw">${v1Label}</text>`;
+      if(vLen2>=MIN_ARROW)
+        arrows+=`<text x="${center2+20-vLen2/2}" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="#a51d1d" class="raw">${v2Label}</text>`;
+    }
+    $('vectors').innerHTML=arrows;
+
+    // Cronología. El extremo es el tiempo de encuentro, que se revela a petición.
+    const progressX=L0+SPAN*tc/te;
+    $('timeProgress').setAttribute('x2',progressX);
+    $('timeMarker').setAttribute('cx',progressX);
+    $('timeMarkerLabel').setAttribute('x',progressX);
+    $('timeMarkerLabel').textContent=`t = ${f(tc)} s`;
+    $('timeTicks').innerHTML=ticks(te);
+    $('timeEndLabel').textContent=showSol?`tₑ = ${f(te)} s`:'tₑ = ?';
+
+    // Lecturas: magnitudes s1,s2 ≥0; posiciones x1,x2; componentes con signo.
+    $('rT').textContent=f(tc)+' s';
+    $('rGap').textContent=f(Math.max(0,d-s1-s2))+' m';
+    $('rX1').textContent=f(s1)+' m';
+    $('rX2').textContent=f(s2)+' m';
+    $('rC1').textContent=f(x1)+' m';
+    $('rC2').textContent=f(x2)+' m';
+    $('rV1').textContent=fs(v1)+' m/s';
+    $('rV2').textContent=fs(v2)+' m/s';
+
+    // Revelar resultados sólo cuando se solicite o haya ocurrido el encuentro.
+    $('result').classList.toggle('revealed',showSol);
+    $('rTe').textContent=showSol?`${f(te)} s`:'—';
+    $('rXe').textContent=showSol?`${f(se)} m`:'—';
+    $('rVe').textContent=showSol?`v₁ = ${fs(a1*te)} m/s · v₂ = ${fs(-a2*te)} m/s`:'—';
+    const chk1=.5*a1*te*te,chk2=.5*a2*te*te;
+    $('rCheck').textContent=showSol?`s₁ + s₂ = ${f(chk1)} + ${f(chk2)} = ${f(d)} m ✓`:'—';
+
+    if(done) $('status').textContent=`Encuentro en t = ${f(te)} s, a ${f(se)} m del origen azul`;
+    else if(running) $('status').textContent='Ambos móviles aceleran hacia el encuentro';
+    else if(tc<1e-9) $('status').textContent='En reposo: listos para iniciar';
+    else $('status').textContent=`Pausado en t = ${f(tc)} s`;
+
+    $('playBtn').textContent=running?'Pausar ⏸':done?'Repetir ▶':t>0?'Continuar ▶':'Iniciar ▶';
+    $('stepBtn').disabled=done;
+  }
+
+  function reset() {t=0;running=false;last=null;render();}
+  $('playBtn').addEventListener('click',()=>{
+    if(physics().done){t=0;running=true;}
+    else running=!running;
+    last=null;render();
+  });
+  $('resetBtn').addEventListener('click',reset);
+  $('stepBtn').addEventListener('click',()=>{
+    if(physics().done)return;
+    running=false;last=null;t=Math.min(t+.1,physics().te);render();
+  });
+  ['dIn','a1In','a2In'].forEach(id=>$(id).addEventListener('input',reset));
+  ['chkV','chkA','chkX','chkX0','chkSolution'].forEach(id=>$(id).addEventListener('change',render));
+
+  function frame(now){
+    if(last===null)last=now;
+    const dt=Math.min(.05,(now-last)/1000);
+    last=now;
+    if(running){
+      t=Math.min(t+dt*(+$('speedIn').value),physics().te);
+      if(physics().done)running=false;
+      render();
+    }
+    requestAnimationFrame(frame);
+  }
+  reset();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
