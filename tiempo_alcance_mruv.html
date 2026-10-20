@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiempo de alcance en un MRUV</title>
+<style>
+  :root {
+    --navy: #0f2942;
+    --muted: #46607c;
+    --border: #cfdeed;
+    --surface: #ffffff;
+    --surface-alt: #f5f9fd;
+    --page: #eaf1f8;
+    --blue: #1f6fd1;
+    --red: #d62828;
+    --pink: #e6007e;
+    --green: #0b8744;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(15,41,66,.06), 0 6px 18px rgba(15,41,66,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px; background: var(--page); color: var(--navy);
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Arial, sans-serif;
+    font-size: 17px; line-height: 1.45;
+  }
+  .wrap { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns:minmax(0,1fr); gap: 16px; }
+  .card { min-width:0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; }
+  h1 { margin: 0 0 6px; font-size: clamp(22px, 2.6vw, 30px); letter-spacing: -.01em; }
+  .subtitle { margin: 0; color: var(--muted); font-size: 16px; }
+  h2 { margin: 0 0 12px; font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 16px; align-items: start; }
+  .stage-main { min-width: 0; display: grid; grid-template-columns:minmax(0,1fr); align-content: start; gap: 16px; }
+  .side { display: grid; gap: 14px; position: sticky; top: 12px; }
+  .scene-wrap { min-width:0; max-width:100%; border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; background: #fff; }
+  .scene { display: block; width: 100%; height: auto; min-width: 780px; }
+  .scene text { font-family: 'Segoe UI', system-ui, Arial, sans-serif; paint-order: stroke fill; stroke: #fff; stroke-width: 5px; stroke-linejoin: round; }
+  .scene text.raw { stroke: none; paint-order: normal; }
+  .mobileHint { display: none; font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 15px; font-weight: 700; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+  .note { font-size: 15px; color: var(--muted); margin: 10px 0 0; }
+
+  .row { margin-bottom: 12px; }
+  .row-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 16px; font-weight: 700; }
+  output { font-weight: 800; color: var(--blue); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; margin: 4px 0 0; accent-color: var(--blue); cursor: pointer; }
+  select { width: 100%; padding: 8px 10px; border: 1px solid #b8cfe4; border-radius: 8px; font: inherit; font-size: 16px; background: #fff; }
+  .chk { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; margin: 8px 0; cursor: pointer; }
+  .chk input { width: 18px; height: 18px; accent-color: var(--blue); cursor: pointer; margin: 0; }
+  .hint { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+  button { font: inherit; font-weight: 800; font-size: 16px; padding: 10px 6px; border-radius: 10px; border: 1px solid transparent; background: var(--blue); color: #fff; cursor: pointer; }
+  button:hover { filter: brightness(.93); }
+  button.secondary { background: #fff; color: var(--navy); border-color: #b8cfe4; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #7fb8ff; outline-offset: 2px; }
+
+  .status { display: block; margin-top: 12px; text-align: center; font-size: 15px; font-weight: 800; color: #7a4300; background: #fff6e5; border: 1px solid #f3d08e; border-radius: 999px; padding: 7px 12px; }
+  .trend { display: block; margin-top: 8px; text-align: center; font-size: 15px; font-weight: 700; color: var(--muted); }
+
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric { border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--surface-alt); text-align: center; }
+  .metric small { display: block; font-size: 14px; color: var(--muted); font-weight: 700; }
+  .metric strong { font-size: 19px; font-variant-numeric: tabular-nums; }
+
+  .result { border-left: 5px solid var(--pink); background: #fff5fa; border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+  .result p { margin: 4px 0; font-size: 16px; }
+  .is-hidden { display: none; }
+  .zoomNote { font-size:14px; margin:10px 0 0; padding:7px 10px; border:1px solid #f0d0a1; border-radius:8px; background:#fff8ed; color:#775019; }
+  .zoomNote[hidden] { display:none; }
+  .formulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
+  .formula { background: var(--surface-alt); border: 1px solid var(--border); border-left: 5px solid var(--blue); border-radius: 10px; padding: 10px 14px; font-size: 17px; font-weight: 700; }
+
+  @media (max-width: 1020px) {
+    .stage { grid-template-columns: minmax(0,1fr); }
+    .side { position: static; }
+    .mobileHint { display: block; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <header class="card">
+    <h1>Tiempo de alcance en un MRUV</h1>
+    <p class="subtitle">
+      El auto azul parte detrás del rojo y ambos avanzan hacia la derecha con aceleraciones constantes (que pueden ser cero).
+      Observa cuándo y dónde el azul alcanza al rojo.
+    </p>
+  </header>
+
+  <div class="stage">
+    <div class="stage-main">
+    <section class="card" aria-label="Animación del alcance">
+      <div class="scene-wrap">
+        <svg id="scene" class="scene" viewBox="0 0 900 530" role="img" aria-label="Animación del alcance de un auto sobre otro en MRUV">
+          <defs>
+            <marker id="arrBlue" viewBox="0 0 18 18" markerWidth="19" markerHeight="19" refX="14" refY="9" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 2 L17 9 L1 16 L5.5 9 Z" fill="#1f6fd1"/>
+            </marker>
+            <marker id="arrRed" viewBox="0 0 18 18" markerWidth="19" markerHeight="19" refX="14" refY="9" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 2 L17 9 L1 16 L5.5 9 Z" fill="#d62828"/>
+            </marker>
+            <marker id="arrVBlue" viewBox="0 0 18 18" markerWidth="21" markerHeight="21" refX="14" refY="9" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1 L17 9 L1 17 L6 9 Z" fill="#0b5fb8"/>
+            </marker>
+            <marker id="arrVRed" viewBox="0 0 18 18" markerWidth="21" markerHeight="21" refX="14" refY="9" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 1 L17 9 L1 17 L6 9 Z" fill="#a51d1d"/>
+            </marker>
+            <marker id="arrPink" viewBox="0 0 12 12" markerWidth="10" markerHeight="10" refX="8" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M1 2 L10 6 L1 10 Z" fill="#e6007e"/>
+            </marker>
+            <marker id="arrDim" viewBox="0 0 10 10" markerWidth="9" markerHeight="9" refX="5" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+              <path d="M0 0 L10 5 L0 10 Z" fill="#0b8744"/>
+            </marker>
+            <marker id="arrDimStart" viewBox="0 0 10 10" markerWidth="9" markerHeight="9" refX="5" refY="5" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+              <path d="M0 0 L10 5 L0 10 Z" fill="#0b8744"/>
+            </marker>
+          </defs>
+
+          <!-- Arcos de tiempo tₐ (crecen con el movimiento) -->
+          <path id="arcLeft" fill="none" stroke="#e6007e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrPink)"/>
+          <path id="arcRight" fill="none" stroke="#e6007e" stroke-width="3.5" stroke-linecap="round" marker-end="url(#arrPink)"/>
+          <text id="arcLeftLabel" text-anchor="middle" font-size="22" font-weight="800" fill="#e6007e" class="raw"></text>
+          <text id="arcRightLabel" text-anchor="middle" font-size="22" font-weight="800" fill="#e6007e" class="raw"></text>
+
+          <!-- Carretera -->
+          <rect x="0" y="300" width="900" height="100" fill="#d9dde3"/>
+          <line x1="0" y1="300" x2="900" y2="300" stroke="#4b5563" stroke-width="3"/>
+          <line x1="0" y1="352" x2="900" y2="352" stroke="#ffffff" stroke-width="3" stroke-dasharray="18 14" opacity=".8"/>
+
+          <!-- Línea de alcance -->
+          <line id="meetLine" x1="0" y1="40" x2="0" y2="300" stroke="#0f2942" stroke-width="2.5" stroke-dasharray="7 6"/>
+          <text id="meetLabel" x="0" y="30" text-anchor="middle" font-size="19" font-weight="800" fill="#0f2942" class="raw">Alcance</text>
+
+          <!-- Etiquetas de posición inicial (autos transparentes) -->
+          <text id="x0Label1" y="324" text-anchor="middle" font-size="17" font-weight="800" fill="#1f6fd1" class="raw">inicio</text>
+          <text id="x0Label2" y="324" text-anchor="middle" font-size="17" font-weight="800" fill="#d62828" class="raw">inicio</text>
+          <g id="ghosts"></g>
+
+          <!-- Distancias d₁ y d₂ -->
+          <line id="disp2" x1="0" y1="344" x2="0" y2="344" stroke="#d62828" stroke-width="9" stroke-linecap="round"/>
+          <text id="disp2Label" y="366" text-anchor="middle" font-size="18" font-weight="800" fill="#d62828" class="raw">d₂</text>
+          <line id="disp1" x1="0" y1="386" x2="0" y2="386" stroke="#1f6fd1" stroke-width="9" stroke-linecap="round"/>
+          <text id="disp1Label" y="408" text-anchor="middle" font-size="18" font-weight="800" fill="#1f6fd1" class="raw">d₁</text>
+
+          <!-- Distancia inicial d -->
+          <line id="dimLine" x1="110" y1="436" x2="110" y2="436" stroke="#0b8744" stroke-width="2.5" marker-start="url(#arrDimStart)" marker-end="url(#arrDim)"/>
+          <text id="dimLabel" x="450" y="458" text-anchor="middle" font-size="19" font-weight="800" fill="#0b8744" class="raw">d</text>
+
+          <!-- Autos -->
+          <g id="cars"></g>
+
+          <!-- Vectores de aceleración y velocidad -->
+          <g id="vectors"></g>
+
+          <!-- Línea del tiempo: 0 a tₐ -->
+          <line id="timeAxis" x1="130" y1="500" x2="770" y2="500" stroke="#9aa9ba" stroke-width="5" stroke-linecap="round"/>
+          <line id="timeProgress" x1="130" y1="500" x2="130" y2="500" stroke="#e6007e" stroke-width="7" stroke-linecap="round"/>
+          <g id="timeTicks"></g>
+          <circle id="timeMarker" cx="130" cy="500" r="9" fill="#e6007e" stroke="#fff" stroke-width="3"/>
+          <text id="timeMarkerLabel" x="130" y="478" text-anchor="middle" font-size="17" font-weight="800" fill="#b0005c" class="raw">t</text>
+          <text x="48" y="506" font-size="17" font-weight="800" fill="#46607c" class="raw">t</text>
+          <text id="timeEndLabel" x="784" y="506" text-anchor="start" font-size="17" font-weight="800" fill="#b0005c" class="raw">tₐ</text>
+        </svg>
+      </div>
+      <p class="mobileHint">Desliza horizontalmente la escena para ver toda la trayectoria.</p>
+      <div class="legend" aria-label="Convención de colores">
+        <span><i class="sw" style="background:#1f6fd1"></i>Auto 1 (azul, detrás)</span>
+        <span><i class="sw" style="background:#d62828"></i>Auto 2 (rojo, delante)</span>
+        <span><i class="sw" style="background:#e6007e"></i>Tiempo de alcance tₐ</span>
+        <span><i class="sw" style="background:#0b8744"></i>Distancia inicial d</span>
+      </div>
+      <p class="note">
+        Las flechas son vectores: su dirección indica el sentido del movimiento y su longitud es proporcional a la magnitud. Los valores de velocidad se leen en m/s y los de aceleración en m/s².
+        Los autos transparentes muestran la posición inicial de cada uno. La separación inicial d va del frente del azul a la parte trasera del rojo. Para proyectar flechas pequeñas se emplea una longitud mínima visible sin alterar sus valores físicos.
+      </p>
+      <p id="zoomNote" class="zoomNote" hidden>Escala adaptable: la vista se amplía al comienzo y se reduce gradualmente al avanzar. Las distancias y velocidades indicadas conservan su valor real.</p>
+    </section>
+
+    <section class="card" aria-label="Fórmulas">
+      <h2>Fórmulas (MRUV, ambos autos en la misma dirección)</h2>
+      <div class="formulas">
+        <div class="formula">d₁ = v₀₁ · t + ½ · a₁ · t²</div>
+        <div class="formula">d₂ = v₀₂ · t + ½ · a₂ · t²</div>
+        <div class="formula">Alcance: d₁ = d + d₂</div>
+        <div class="formula">½(a₁ − a₂)·t² + (v₀₁ − v₀₂)·t − d = 0</div>
+        <div class="formula">tₐ = menor raíz positiva</div>
+        <div class="formula">v₁ = v₀₁ + a₁t; v₂ = v₀₂ + a₂t</div>
+      </div>
+      <p class="note">v₀₁ y v₀₂ son las velocidades <b>iniciales</b>. Las flechas v₁ y v₂ representan las velocidades <b>en cada instante</b>. La distancia inicial d no cambia; la separación actual sí puede variar.</p>
+    </section>
+    </div>
+
+    <aside class="side">
+      <section class="card" aria-label="Datos del problema">
+        <h2>Datos</h2>
+        <div class="row">
+          <div class="row-head"><label for="dIn">Distancia inicial d</label><output id="dOut">60 m</output></div>
+          <input id="dIn" type="range" min="20" max="200" step="1" value="60">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="v1In" style="color:var(--blue)">Velocidad inicial v₀₁ (azul)</label><output id="v1Out">5,0 m/s</output></div>
+          <input id="v1In" type="range" min="0" max="30" step="0.5" value="5">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="a1In" style="color:var(--blue)">Aceleración a₁ (azul)</label><output id="a1Out">2,0 m/s²</output></div>
+          <input id="a1In" type="range" min="0" max="4" step="0.1" value="2">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="v2In" style="color:var(--red)">Velocidad inicial v₀₂ (roja)</label><output id="v2Out">10,0 m/s</output></div>
+          <input id="v2In" type="range" min="0" max="30" step="0.5" value="10">
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="a2In" style="color:var(--red)">Aceleración a₂ (roja)</label><output id="a2Out">0,5 m/s²</output></div>
+          <input id="a2In" type="range" min="0" max="4" step="0.1" value="0.5">
+        </div>
+        <div class="row">
+          <label for="speedIn" style="font-size:16px;font-weight:700">Velocidad de la animación</label>
+          <select id="speedIn">
+            <option value="0.5">0,5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="row-head"><label for="scrubIn">Explorar el tiempo</label><output id="scrubOut">0,00 s</output></div>
+          <input id="scrubIn" type="range" min="0" max="10" step="any" value="0" aria-label="Seleccionar instante de tiempo">
+        </div>
+        <div class="actions">
+          <button id="playBtn" type="button">Iniciar ▶</button>
+          <button id="resetBtn" type="button" class="secondary">Reiniciar</button>
+          <button id="stepBtn" type="button" class="secondary">+0,1 s</button>
+        </div>
+        <span id="status" class="status" aria-live="polite">Listos para iniciar</span>
+        <span id="trend" class="trend"></span>
+      </section>
+
+      <section class="card" aria-label="Mostrar valores">
+        <h2>Mostrar en la animación</h2>
+        <p class="hint" style="margin:0 0 6px">Sin marcar: solo letras. Marcada: aparecen los valores numéricos.</p>
+        <label class="chk"><input id="chkV" type="checkbox"> Valores de velocidad</label>
+        <label class="chk"><input id="chkA" type="checkbox"> Valores de aceleración</label>
+        <label class="chk"><input id="chkD" type="checkbox"> Valores de distancia</label>
+        <label class="chk"><input id="chkT" type="checkbox"> Valores de tiempo</label>
+        <label class="chk"><input id="chkX0" type="checkbox"> Posiciones iniciales</label>
+        <label class="chk"><input id="chkSolution" type="checkbox"> Revelar la solución</label>
+        <p class="hint" id="hiddenNotice">La solución está oculta: intenta predecir el resultado antes de revelarlo.</p>
+      </section>
+
+      <section class="card" aria-label="Lecturas">
+        <h2>Lecturas en t</h2>
+        <div class="metrics">
+          <div class="metric"><small>Tiempo t</small><strong id="rT">0,00 s</strong></div>
+          <div class="metric"><small>Separación actual</small><strong id="rGap">60,00 m</strong></div>
+          <div class="metric"><small>d₁ (azul)</small><strong id="rX1" style="color:var(--blue)">0,00 m</strong></div>
+          <div class="metric"><small>d₂ (rojo)</small><strong id="rX2" style="color:var(--red)">0,00 m</strong></div>
+          <div class="metric"><small>v₁</small><strong id="rV1" style="color:var(--blue)">5,00 m/s</strong></div>
+          <div class="metric"><small>v₂</small><strong id="rV2" style="color:var(--red)">10,00 m/s</strong></div>
+        </div>
+        <div class="result is-hidden" id="resultBox" aria-label="Resultado del alcance">
+          <p><b>Tiempo de alcance tₐ:</b> <span id="rTa">—</span></p>
+          <p><b>Distancia de alcance:</b> <span id="rXa">—</span> desde el punto inicial del azul</p>
+          <p><b>Velocidades al alcanzar:</b> <span id="rVa">—</span></p>
+          <p><b>Comprobación:</b> <span id="rCheck">—</span></p>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // Geometría (píxeles de la escena)
+  const P0 = 110;                 // frente del auto azul al inicio
+  const W = 84, ROAD = 300;       // ancho del auto y línea de la carretera
+  const MAXPX = 640;              // ancho que ocupa la distancia máxima
+  const ACC_K = 14;               // px por m/s² (aceleración)
+  const VEL_PX_MAX = 96;          // longitud de la velocidad máxima de la escena
+  const MIN_ARROW = 6;            // flechas más cortas no se dibujan (serían ruido)
+  const T_NO = 10;                // tiempo de observación si no hay alcance
+  const TL0 = 130, TL1 = 770;     // extremos de la línea del tiempo
+
+  // Filas verticales fijas para vectores y arcos
+  const ROW = { arcEnd: 176, aArrow: 208, aText: 194, vArrow: 234, vText: 220 };
+
+  let t = 0, running = false, last = null;
+
+  const f = (x, n = 2) => (Math.abs(x) < 1e-9 ? 0 : x).toFixed(n).replace('.', ',');
+  const val = id => $(id).checked;
+
+  // t_a: menor raíz positiva de ½(a₁ − a₂)t² + (v₁ − v₂)t − d = 0
+  function solve(d, v1, a1, v2, a2) {
+    const A = 0.5 * (a1 - a2), B = v1 - v2;
+    if (Math.abs(A) < 1e-12) return { ta: B > 0 ? d / B : null };
+    const disc = B * B + 4 * A * d;
+    if (disc < 0) return { ta: null };
+    const s = Math.sqrt(disc);
+    const roots = [(-B + s) / (2 * A), (-B - s) / (2 * A)].filter(x => Number.isFinite(x) && x > 1e-10);
+    return { ta: roots.length ? Math.min(...roots) : null };
+  }
+
+  function params() {
+    return { d: +$('dIn').value, v1: +$('v1In').value, a1: +$('a1In').value,
+             v2: +$('v2In').value, a2: +$('a2In').value };
+  }
+
+  function model() {
+    const q = params(), sol = solve(q.d, q.v1, q.a1, q.v2, q.a2);
+    const end = sol.ta === null ? T_NO : sol.ta;
+    const x1At = tt => q.v1 * tt + 0.5 * q.a1 * tt * tt;
+    const x2At = tt => q.d + q.v2 * tt + 0.5 * q.a2 * tt * tt;
+    return { ...q, ...sol, end, x1At, x2At };
+  }
+
+  // Auto con el frente en fx (avanza hacia +x). label opcional dentro de la carrocería.
+  function car(fx, color, opacity = 1, label = '') {
+    const cx = fx - W / 2, y0 = ROAD - 34, dark = '#1b2b3c';
+    const num = label ? `<text x="${cx}" y="${y0 + 19}" text-anchor="middle" font-size="18" font-weight="800" fill="#fff" class="raw">${label}</text>` : '';
+    return `<g opacity="${opacity}">
+      <rect x="${cx - W/2}" y="${y0}" width="${W}" height="26" rx="9" fill="${color}"/>
+      ${num}
+      <path d="M${cx-24} ${y0} L${cx-14} ${y0-17} L${cx+18} ${y0-17} L${cx+30} ${y0} Z" fill="${color}"/>
+      <path d="M${cx-20} ${y0-1} L${cx-12} ${y0-13} L${cx+2} ${y0-13} L${cx+2} ${y0-1} Z" fill="#dff1ff" opacity=".9"/>
+      <path d="M${cx+6} ${y0-1} L${cx+6} ${y0-13} L${cx+16} ${y0-13} L${cx+25} ${y0-1} Z" fill="#dff1ff" opacity=".9"/>
+      <circle cx="${fx-4}" cy="${y0+9}" r="3" fill="#fff7c2"/>
+      <circle cx="${fx-W+4}" cy="${y0+9}" r="3" fill="#ff8a8a"/>
+      <circle cx="${cx-24}" cy="${y0+26}" r="9" fill="${dark}"/>
+      <circle cx="${cx-24}" cy="${y0+26}" r="3.5" fill="#9aa5b1"/>
+      <circle cx="${cx+24}" cy="${y0+26}" r="9" fill="${dark}"/>
+      <circle cx="${cx+24}" cy="${y0+26}" r="3.5" fill="#9aa5b1"/>
+    </g>`;
+  }
+
+  // Flecha horizontal proporcional: len ya está en píxeles
+  function arrow(x0, y, len, marker, color, width = 6) {
+    if (len < MIN_ARROW) return '';
+    return `<line x1="${x0}" y1="${y}" x2="${x0 + len}" y2="${y}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" marker-end="url(#${marker})"/>`;
+  }
+
+  // Marcas de tiempo legibles: 5 a 7 divisiones
+  function niceStep(v) {
+    const e = Math.floor(Math.log10(v)), m = 10 ** e, n = v / m;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * m;
+  }
+  function ticks(end) {
+    const step = niceStep(end / 6);
+    const dp = step < 1 ? (step < 0.1 ? 2 : 1) : 0;
+    let s = '';
+    for (let k = 0; k * step < end - 1e-9 && k < 8; k++) {
+      const tk = k * step, x = TL0 + (TL1 - TL0) * tk / end;
+      if (x > TL1 - 26) break;
+      s += `<line x1="${x}" y1="490" x2="${x}" y2="510" stroke="#46607c" stroke-width="2.5"/>`;
+      s += `<text x="${x}" y="526" text-anchor="middle" font-size="16" font-weight="800" fill="#46607c" class="raw">${f(tk, dp)}</text>`;
+    }
+    return s;
+  }
+
+  function render() {
+    const q = model();
+    $('dOut').textContent = `${Math.round(q.d)} m`;
+    $('v1Out').textContent = `${f(q.v1, 1)} m/s`;
+    $('v2Out').textContent = `${f(q.v2, 1)} m/s`;
+    $('a1Out').textContent = `${f(q.a1, 1)} m/s²`;
+    $('a2Out').textContent = `${f(q.a2, 1)} m/s²`;
+
+    const tc = Math.min(t, q.end);
+    const x1 = q.x1At(tc), x2 = q.x2At(tc);
+    const vA = q.v1 + q.a1 * tc, vB = q.v2 + q.a2 * tc;
+    const gap = Math.max(0, x2 - x1);
+    const done = q.ta !== null && tc >= q.ta - 1e-9;
+    const endOfPreview = q.ta === null && tc >= T_NO - 1e-9;
+    const reveal = val('chkSolution') || done || endOfPreview;
+
+    // Para casos normales, la escala es fija. Si la distancia total es mucho
+    // mayor que el espacio inicial, se activa una vista con zoom continuo:
+    // al comienzo se distinguen los autos; durante el movimiento la escala
+    // se reduce gradualmente para mantener ambos en pantalla.
+    const Xmax = Math.max(q.d, q.x1At(q.end), q.x2At(q.end), 1);
+    const zoom = Xmax / q.d > 8;
+    const seenMax = Math.max(q.d, x1, x2, 1);
+    const sc = zoom ? Math.min(350 / q.d, MAXPX / seenMax) : MAXPX / Xmax;
+    $('zoomNote').hidden = !zoom;
+    const P = x => P0 + x * sc;
+    const front1 = P(x1), rear2 = P(x2), start2 = P(q.d);
+    const c1 = front1 - W / 2, c2 = rear2 + W / 2;
+
+    // Arcos tₐ: cada uno parte de su auto y crece hacia el punto de encuentro
+    const showL = front1 - P0 > 4, showR = rear2 - start2 > 4;
+    $('arcLeft').setAttribute('d', showL ? `M${P0} ${ROW.arcEnd} Q${(P0 + front1) / 2} -56 ${front1 - 3} ${ROW.arcEnd}` : '');
+    $('arcRight').setAttribute('d', showR ? `M${start2} ${ROW.arcEnd} Q${(start2 + rear2) / 2} -56 ${rear2 - 3} ${ROW.arcEnd}` : '');
+    const arcTxt = q.ta === null ? '' : 'tₐ';
+    $('arcLeftLabel').textContent = arcTxt;
+    $('arcRightLabel').textContent = arcTxt;
+    $('arcLeftLabel').setAttribute('x', (P0 + front1) / 2);
+    $('arcRightLabel').setAttribute('x', (start2 + rear2) / 2);
+    $('arcLeftLabel').setAttribute('y', 118);
+    $('arcRightLabel').setAttribute('y', 118);
+    $('arcLeftLabel').setAttribute('visibility', showL && q.ta !== null ? 'visible' : 'hidden');
+    $('arcRightLabel').setAttribute('visibility', showR && q.ta !== null ? 'visible' : 'hidden');
+
+    // Línea y etiqueta de alcance (solo cuando se permite mostrar)
+    if (q.ta !== null && reveal) {
+      const meetX = P(q.x1At(q.ta));
+      $('meetLine').setAttribute('x1', meetX);
+      $('meetLine').setAttribute('x2', meetX);
+      let meetTxt = 'Alcance';
+      if (val('chkT')) meetTxt += ` · tₐ = ${f(q.ta)} s`;
+      if (val('chkD')) meetTxt += ` · d₁ = ${f(q.x1At(q.ta), 1)} m`;
+      $('meetLabel').textContent = meetTxt;
+      // Medir el texto real en SVG y mantener la etiqueta íntegra en escena.
+      const txtWidth = $('meetLabel').getComputedTextLength();
+      const half = txtWidth / 2 + 14;
+      $('meetLabel').setAttribute('x', Math.max(half, Math.min(900 - half, meetX)));
+      $('meetLine').setAttribute('visibility', 'visible');
+      $('meetLabel').setAttribute('visibility', 'visible');
+    } else {
+      $('meetLine').setAttribute('visibility', 'hidden');
+      $('meetLabel').setAttribute('visibility', 'hidden');
+    }
+
+    // Distancia inicial d
+    $('dimLine').setAttribute('x1', P0);
+    $('dimLine').setAttribute('x2', start2);
+    const shortGap = start2 - P0 < 105;
+    $('dimLabel').setAttribute('x', shortGap ? start2 + 16 : (P0 + start2) / 2);
+    $('dimLabel').setAttribute('text-anchor', shortGap ? 'start' : 'middle');
+    $('dimLabel').textContent = val('chkD') ? `d = ${Math.round(q.d)} m` : 'd';
+
+    // Desplazamientos d₁ (azul) y d₂ (rojo)
+    $('disp1').setAttribute('x1', P0); $('disp1').setAttribute('x2', front1);
+    $('disp2').setAttribute('x1', start2); $('disp2').setAttribute('x2', rear2);
+    $('disp1Label').setAttribute('x', (P0 + front1) / 2);
+    $('disp2Label').setAttribute('x', (start2 + rear2) / 2);
+    $('disp1Label').textContent = val('chkD') ? `d₁ = ${f(x1, 1)} m` : 'd₁';
+    $('disp2Label').textContent = val('chkD') ? `d₂ = ${f(x2 - q.d, 1)} m` : 'd₂';
+
+    // Posiciones iniciales (autos transparentes)
+    const g1 = P0 - W / 2, g2 = start2 + W / 2;
+    $('x0Label1').setAttribute('x', shortGap ? g1 - 12 : g1);
+    $('x0Label2').setAttribute('x', shortGap ? g2 + 12 : g2);
+    $('x0Label1').setAttribute('text-anchor', shortGap ? 'end' : 'middle');
+    $('x0Label2').setAttribute('text-anchor', shortGap ? 'start' : 'middle');
+    $('x0Label1').textContent = val('chkX0') ? '0 m' : 'inicio';
+    $('x0Label2').textContent = val('chkX0') ? `${Math.round(q.d)} m` : 'inicio';
+    $('ghosts').innerHTML = car(P0, '#1f6fd1', 0.22) + car(start2 + W, '#d62828', 0.22);
+
+    // Autos en movimiento con estelas suaves
+    let cars = '';
+    [[0.7, 0.2], [1.4, 0.1]].forEach(([dt, op]) => {
+      if (tc > dt) {
+        cars += car(P(q.x1At(tc - dt)), '#1f6fd1', op);
+        cars += car(P(q.x2At(tc - dt)) + W, '#d62828', op);
+      }
+    });
+    cars += car(front1, '#1f6fd1', 1, '1') + car(rear2 + W, '#d62828', 1, '2');
+    $('cars').innerHTML = cars;
+
+    // Vectores con posiciones verticales ESTABLES: ninguna etiqueta cambia
+    // de fila al acercarse los autos. Cada móvil ocupa dos niveles propios.
+    // Los módulos conservan escala común salvo un mínimo visible para valores
+    // pequeños (sin afectar los valores numéricos ni las ecuaciones).
+    const vMaxAll = Math.max(q.v1, q.v2, q.v1 + q.a1 * q.end, q.v2 + q.a2 * q.end, 1e-9);
+    const kV = VEL_PX_MAX / vMaxAll;
+    const aLen1 = q.a1 > 0 ? Math.max(30, q.a1 * ACC_K) : 0;
+    const aLen2 = q.a2 > 0 ? Math.max(30, q.a2 * ACC_K) : 0;
+    const vLen1 = vA > 0 ? Math.max(34, vA * kV) : 0;
+    const vLen2 = vB > 0 ? Math.max(34, vB * kV) : 0;
+    const base1 = Math.max(16, Math.min(875 - Math.max(aLen1,vLen1), c1 - 16));
+    const base2 = Math.max(16, Math.min(875 - Math.max(aLen2,vLen2), c2 - 16));
+    const label = (txt, x, y, color) =>
+      `<text x="${x}" y="${y}" text-anchor="middle" font-size="18" font-weight="800" fill="${color}" class="raw">${txt}</text>`;
+    // Niveles dedicados: rojo arriba y azul abajo. La velocidad está sobre
+    // la carrocería, sin superponerse a ella ni saltar de una fila a otra.
+    const blueA = 187, blueV = 232, redA = 106, redV = 148;
+    const blueAText = 167, blueVText = 214, redAText = 87, redVText = 129;
+    let vec = '';
+    vec += arrow(base1, blueA, aLen1, 'arrBlue', '#1f6fd1', 4.2);
+    vec += arrow(base2, redA, aLen2, 'arrRed', '#d62828', 4.2);
+    vec += label(val('chkA') ? `a₁ = ${f(q.a1,1)} m/s²` : 'a₁', base1 + aLen1/2, blueAText, '#1f6fd1');
+    vec += label(val('chkA') ? `a₂ = ${f(q.a2,1)} m/s²` : 'a₂', base2 + aLen2/2, redAText, '#d62828');
+    vec += arrow(base1, blueV, vLen1, 'arrVBlue', '#0b5fb8', 4.6);
+    vec += arrow(base2, redV, vLen2, 'arrVRed', '#a51d1d', 4.6);
+    vec += label(val('chkV') ? `v₁ = ${f(vA,1)} m/s` : 'v₁', base1 + vLen1/2, blueVText, '#0b5fb8');
+    vec += label(val('chkV') ? `v₂ = ${f(vB,1)} m/s` : 'v₂', base2 + vLen2/2, redVText, '#a51d1d');
+    $('vectors').innerHTML = vec;
+
+    // Línea del tiempo
+    const tx = TL0 + (TL1 - TL0) * tc / q.end;
+    $('timeProgress').setAttribute('x2', tx);
+    $('timeMarker').setAttribute('cx', tx);
+    $('timeMarkerLabel').setAttribute('x', Math.max(150, Math.min(750, tx)));
+    $('timeMarkerLabel').textContent = val('chkT') ? `t = ${f(tc)} s` : 't';
+    $('timeEndLabel').textContent = q.ta === null ? 'Fin' : (val('chkT') && reveal ? `tₐ = ${f(q.ta)} s` : 'tₐ');
+    $('timeTicks').innerHTML = ticks(q.end);
+    $('scrubIn').max = String(q.end);
+    $('scrubIn').value = String(tc);
+    $('scrubOut').textContent = `${f(tc)} s`;
+
+    // Lecturas
+    $('rT').textContent = `${f(tc)} s`;
+    $('rGap').textContent = `${f(gap)} m`;
+    $('rX1').textContent = `${f(x1)} m`;
+    $('rX2').textContent = `${f(x2 - q.d)} m`;
+    $('rV1').textContent = `${f(vA)} m/s`;
+    $('rV2').textContent = `${f(vB)} m/s`;
+
+    // Resultado: solo cuando se permite revelar
+    $('resultBox').classList.toggle('is-hidden', !reveal);
+    $('hiddenNotice').style.display = reveal ? 'none' : '';
+    if (reveal && q.ta !== null) {
+      const xa = q.x1At(q.ta), xb = q.x2At(q.ta);
+      $('rTa').textContent = `${f(q.ta)} s`;
+      $('rXa').textContent = `${f(xa)} m`;
+      $('rVa').textContent = `v₁ = ${f(q.v1 + q.a1 * q.ta)} m/s · v₂ = ${f(q.v2 + q.a2 * q.ta)} m/s`;
+      $('rCheck').textContent = `d₁ − (d + d₂) = ${f(xa - xb)} m ${Math.abs(xa - xb) < 1e-6 ? '✓' : '(revisar)'}`;
+    } else if (reveal) {
+      $('rTa').textContent = 'No existe alcance';
+      $('rXa').textContent = '—';
+      $('rVa').textContent = '—';
+      $('rCheck').textContent = 'La ecuación no tiene raíces positivas';
+    }
+
+    // Estado y tendencia
+    const dv = vA - vB;
+    if (done) {
+      $('status').textContent = `¡Alcance en tₐ = ${f(q.ta)} s!`;
+      $('trend').textContent = 'El auto azul alcanza al rojo';
+    } else if (endOfPreview) {
+      $('status').textContent = 'Fin de la observación (10 s)';
+      $('trend').textContent = 'No hay alcance con estos datos';
+    } else {
+      $('status').textContent = running ? 'Movimiento en curso' : (t === 0 ? 'Listos para iniciar' : `Pausado en t = ${f(tc)} s`);
+      $('trend').textContent = dv > 1e-7 ? 'El azul se acerca al rojo (v₁ > v₂)' :
+        dv < -1e-7 ? 'El azul se aleja del rojo (v₁ < v₂)' : 'Velocidades iguales en este instante';
+    }
+    $('playBtn').textContent = running ? 'Pausar ⏸' : (tc >= q.end - 1e-9 ? 'Repetir ↺' : (tc > 0 ? 'Seguir ▶' : 'Iniciar ▶'));
+  }
+
+  function reset() { t = 0; running = false; last = null; render(); }
+
+  $('playBtn').addEventListener('click', () => {
+    if (t >= model().end - 1e-9) t = 0;
+    running = !running; last = null; render();
+  });
+  $('resetBtn').addEventListener('click', reset);
+  $('stepBtn').addEventListener('click', () => {
+    running = false; t = Math.min(t + 0.1, model().end); render();
+  });
+  $('scrubIn').addEventListener('input', () => {
+    running = false;
+    const end = model().end;
+    const selected = +$('scrubIn').value;
+    t = selected >= end - 1e-9 ? end : Math.max(0, Math.min(selected, end));
+    render();
+  });
+  ['dIn', 'v1In', 'a1In', 'v2In', 'a2In'].forEach(id => $(id).addEventListener('input', reset));
+  ['chkV', 'chkA', 'chkD', 'chkT', 'chkX0', 'chkSolution'].forEach(id => $(id).addEventListener('change', render));
+
+  // Animación con tiempo real: movimiento continuo sin saltos
+  function frame(now) {
+    if (last === null) last = now;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (running) {
+      const end = model().end;
+      t = Math.min(t + dt * (+$('speedIn').value), end);
+      if (t >= end - 1e-9) running = false;
+      render();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
