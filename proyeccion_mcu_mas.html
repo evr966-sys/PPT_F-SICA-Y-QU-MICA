@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador: Proyección del MCU en el MAS</title>
+<style>
+  :root {
+    --navy: #0f2942;
+    --blue: #0062cc;
+    --blue-dark: #004ea3;
+    --muted: #4a6785;
+    --border: #d5e3f0;
+    --surface: #ffffff;
+    --surface-alt: #f6f9fd;
+    --page: #ffffff;
+    --green: #0b8744;
+    --red: #d92b2b;
+    --orange: #e07400;
+    --pink: #c2185b;
+    --purple: #7b1fa2;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(15, 41, 66, .05), 0 4px 14px rgba(15, 41, 66, .06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--page);
+    color: var(--navy);
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ---------- Encabezado ---------- */
+  header.card { padding: 16px 20px; }
+  h1 {
+    margin: 0 0 4px;
+    font-size: clamp(19px, 2.2vw, 24px);
+    font-weight: 700;
+    letter-spacing: -.01em;
+  }
+  .subtitle { margin: 0; color: var(--muted); font-size: 14px; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 6px 14px;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 13px; font-weight: 600;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 11px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+
+  /* ---------- Diseño principal: escena + menú lateral ---------- */
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 14px;
+    align-items: start;
+  }
+  .stage-main { min-width: 0; }
+  .stage-side {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    position: sticky;
+    top: 12px;
+  }
+
+  /* ---------- Escena (SVG) ---------- */
+  .scene-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+  .scene {
+    display: block;
+    width: 100%;
+    min-width: 600px;
+    height: auto;
+    background: #fff;
+  }
+  .scene-note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+
+  svg text {
+    font-family: 'Segoe UI', system-ui, Roboto, Arial, sans-serif;
+    paint-order: stroke fill;
+    stroke: #ffffff;
+    stroke-width: 4px;
+    stroke-linejoin: round;
+    user-select: none;
+  }
+  svg text.no-halo { stroke: none; paint-order: normal; }
+  .math { font-family: 'Cambria Math', 'Times New Roman', Georgia, serif; font-style: italic; font-weight: 700; }
+
+  /* ---------- Cuadro cinemático (compacto) ---------- */
+  .kin { padding: 12px 14px; }
+  .kin p { margin: 2px 0; font-size: 13px; }
+  .kin hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+  .kin .kin-main { font-weight: 700; color: var(--pink); }
+  .kin .kin-sub { font-weight: 700; color: #1b436b; margin-bottom: 2px; }
+  .kin .eq { font-weight: 700; }
+  .kin .scale { font-size: 11.5px; color: var(--muted); margin: 0; }
+  .c-x { color: var(--blue); }
+  .c-v { color: var(--orange); }
+  .c-a { color: var(--red); }
+
+  /* ---------- Menú de control (compacto) ---------- */
+  .ctrl { padding: 12px 14px; }
+  .row { margin-bottom: 9px; }
+  .row-head {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    font-size: 13.5px; font-weight: 600;
+  }
+  output {
+    font-weight: 700; color: var(--blue);
+    font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13.5px;
+  }
+  input[type="range"] {
+    width: 100%; margin: 3px 0 0; height: 18px;
+    accent-color: var(--blue); cursor: pointer;
+  }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px; }
+  .cap { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  select {
+    width: 100%;
+    padding: 5px 8px;
+    background: #fff;
+    color: var(--navy);
+    border: 1px solid #b8cfe4;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  button {
+    font: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 7px 6px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    background: var(--blue);
+    color: #fff;
+    transition: background .15s, transform .08s;
+    white-space: nowrap;
+  }
+  button:hover { background: var(--blue-dark); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button:disabled:hover { background: var(--blue); }
+  button.secondary { background: #fff; color: var(--navy); border-color: #b8cfe4; }
+  button.secondary:hover { background: var(--surface-alt); }
+  button:focus-visible, input:focus-visible, select:focus-visible, .toggle input:focus-visible {
+    outline: 3px solid #7fb8ff;
+    outline-offset: 2px;
+  }
+
+  .status {
+    display: block;
+    margin-top: 8px;
+    font-size: 12px; font-weight: 700;
+    color: #8a4b00;
+    background: #fff6e5;
+    border: 1px solid #f3d08e;
+    padding: 4px 10px;
+    border-radius: 999px;
+    text-align: center;
+  }
+
+  /* ---------- Elementos visibles (compacto) ---------- */
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .toggle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 12.5px; font-weight: 600;
+    cursor: pointer; user-select: none;
+    min-width: 0;
+  }
+  .toggle input { accent-color: var(--blue); width: 14px; height: 14px; margin: 0; cursor: pointer; flex: 0 0 auto; }
+
+  /* ---------- Lecturas ---------- */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .metric {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 8px 8px 7px;
+    background: var(--surface-alt);
+    text-align: center;
+    min-width: 0;
+  }
+  .metric small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+  .metric strong {
+    display: block;
+    font-size: 14.5px;
+    white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Fórmulas ---------- */
+  .formulas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 8px;
+  }
+  .formula {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--blue);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .note { font-size: 13.5px; color: var(--muted); margin: 12px 0 0; }
+  .note b { color: var(--navy); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
+
+  /* ---------- Colores de referencia ---------- */
+  .c-vt { color: var(--blue); }
+  .c-ac { color: var(--green); }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1000px) {
+    .stage { grid-template-columns: minmax(0, 1fr); }
+    .stage-side { position: static; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
+  @media (max-width: 900px) { .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 520px) {
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .toggles { grid-template-columns: 1fr; }
+    .card { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <!-- ENCABEZADO -->
+  <header class="card">
+    <h1>Proyección del Movimiento Circular Uniforme (MCU) en el Movimiento Armónico Simple (MAS)</h1>
+    <p class="subtitle">
+      Elige cómo empieza el movimiento: deforma el resorte y suéltalo desde reposo, o deforma e impulsa con una fase inicial φ₀. Después pulsa <b>Soltar</b>.
+       Durante la oscilación, la proyección horizontal del MCU reproduce la posición, la velocidad
+       y la aceleración del bloque unido al resorte.
+    </p>
+    <div class="legend" aria-label="Convención de colores">
+      <span><i class="swatch" style="background:var(--blue)"></i>v<sub>T</sub> · velocidad tangencial (MCU)</span>
+      <span><i class="swatch" style="background:var(--green)"></i>a<sub>c</sub> · aceleración centrípeta (MCU)</span>
+      <span><i class="swatch" style="background:var(--orange)"></i>v<sub>x</sub> · velocidad del bloque (MAS)</span>
+      <span><i class="swatch" style="background:var(--red)"></i>a<sub>x</sub> · aceleración del bloque (MAS)</span>
+      <span><i class="swatch" style="background:var(--pink)"></i>θ · fase actual de la partícula</span>
+      <span><i class="swatch" style="background:var(--purple)"></i>φ₀ · fase inicial</span>
+    </div>
+  </header>
+
+  <div class="stage">
+
+    <!-- ESCENA -->
+    <div class="stage-main">
+      <section class="card" aria-label="Escena de simulación">
+        <div class="scene-wrap">
+          <svg id="scene" class="scene" viewBox="0 0 920 725" xmlns="http://www.w3.org/2000/svg"
+               role="img" aria-label="Simulación sincronizada de MCU y MAS con vectores cinemáticos">
+            <defs>
+              <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#f0f5fa" stroke-width="1"/>
+              </pattern>
+              <marker id="blueTip" viewBox="0 0 12 12" markerWidth="15" markerHeight="15" refX="8.5" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 1.5 L 10.5 6 L 1 10.5 L 3.2 6 Z" fill="#0062cc"/>
+              </marker>
+              <marker id="greenTip" viewBox="0 0 12 12" markerWidth="15" markerHeight="15" refX="8.5" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 1.5 L 10.5 6 L 1 10.5 L 3.2 6 Z" fill="#0b8744"/>
+              </marker>
+              <marker id="orangeTip" viewBox="0 0 12 12" markerWidth="15" markerHeight="15" refX="8.5" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 1.5 L 10.5 6 L 1 10.5 L 3.2 6 Z" fill="#e07400"/>
+              </marker>
+              <marker id="redTip" viewBox="0 0 12 12" markerWidth="15" markerHeight="15" refX="8.5" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 1.5 L 10.5 6 L 1 10.5 L 3.2 6 Z" fill="#d92b2b"/>
+              </marker>
+              <marker id="axisTip" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="7" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 2 L 8 5 L 1 8 Z" fill="#6886a0"/>
+              </marker>
+              <marker id="pinkTip" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="7" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 2 L 8 5 L 1 8 Z" fill="#c2185b"/>
+              </marker>
+              <marker id="goldStart" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="3" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 9 2 L 2 5 L 9 8 Z" fill="#855804"/>
+              </marker>
+              <marker id="goldEnd" viewBox="0 0 10 10" markerWidth="8" markerHeight="8" refX="7" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M 1 2 L 8 5 L 1 8 Z" fill="#855804"/>
+              </marker>
+            </defs>
+
+            <rect width="920" height="725" fill="url(#grid)"/>
+
+            <!-- Límites ±A -->
+            <g id="extremes">
+              <line id="leftExtreme" stroke="#6c8fae" stroke-width="1.8" stroke-dasharray="6 5"/>
+              <line id="rightExtreme" stroke="#6c8fae" stroke-width="1.8" stroke-dasharray="6 5"/>
+              <circle id="leftCircleTouch" r="4.2" fill="#496e8f" stroke="#fff" stroke-width="1.2"/>
+              <circle id="rightCircleTouch" r="4.2" fill="#496e8f" stroke="#fff" stroke-width="1.2"/>
+              <text id="leftCircleText" font-size="13" font-weight="700" fill="#3a5d7c">−A</text>
+              <text id="rightCircleText" font-size="13" font-weight="700" fill="#3a5d7c">+A</text>
+              <text id="leftLabel" y="636" text-anchor="middle" font-size="14" font-weight="700" fill="#2c4c6b">x = −A</text>
+              <text id="rightLabel" y="636" text-anchor="middle" font-size="14" font-weight="700" fill="#2c4c6b">x = +A</text>
+            </g>
+
+            <!-- Posición de equilibrio -->
+            <line id="peLine" x1="480" x2="480" y1="275" y2="660" stroke="#7d9ab5" stroke-dasharray="6 4" stroke-width="1.7"/>
+            <text x="488" y="470" text-anchor="start" font-size="13.5" fill="#855804" font-weight="700">Posición de equilibrio (x = 0)</text>
+
+            <!-- SECCIÓN 1: MCU -->
+            <text x="24" y="34" font-size="20" font-weight="700" fill="#0f2942">1. Movimiento Circular Uniforme (MCU)</text>
+            <text x="24" y="55" font-size="13.5" fill="#4a6785">Radio de la circunferencia igual a la amplitud: R = A</text>
+
+            <circle id="circle" cx="480" cy="275" r="120" fill="#f5faff" fill-opacity="0.55" stroke="#0062cc" stroke-width="2.3" stroke-dasharray="7 5"/>
+
+            <line id="axisX" stroke="#6886a0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#axisTip)"/>
+            <line id="axisY" stroke="#6886a0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#axisTip)"/>
+            <text id="axisXLabel" font-size="14" font-weight="700" fill="#4a6785">+x</text>
+            <text id="axisYLabel" text-anchor="middle" font-size="14" font-weight="700" fill="#4a6785">+y</text>
+
+            <circle cx="480" cy="275" r="4" fill="#0f2942"/>
+            <text x="464" y="293" font-size="14" font-weight="700" fill="#0f2942">O</text>
+
+            <path id="omegaArc" fill="none" stroke="#c2185b" stroke-width="2.1" marker-end="url(#pinkTip)"/>
+            <text id="omegaArcLabel" font-size="15.5" font-weight="700" fill="#c2185b">ω</text>
+
+            <path id="arc" fill="rgba(194, 24, 91, 0.09)" stroke="#c2185b" stroke-width="2.2" marker-end="url(#pinkTip)"/>
+            <text id="thetaArcLabel" font-size="14.5" font-weight="700" fill="#c2185b">θ</text>
+
+            <!-- Ángulo inicial φ₀: radio hasta P₀, arco y etiqueta -->
+            <line id="phi0Line" stroke="#7b1fa2" stroke-width="1.8" stroke-dasharray="4 4"/>
+            <path id="phi0Arc" fill="rgba(123, 31, 162, 0.10)" stroke="#7b1fa2" stroke-width="1.8" stroke-dasharray="3 3"/>
+            <circle id="phi0Dot" r="14" fill="none" stroke="#7b1fa2" stroke-width="2" stroke-dasharray="3 3"/>
+            <text id="phi0ArcLabel" font-size="14" font-weight="700" fill="#7b1fa2">φ₀</text>
+
+            <line id="radius" stroke="#1e3d63" stroke-width="2.8"/>
+            <text id="radLabel" font-size="15" font-weight="700" fill="#1e3d63">A</text>
+
+            <line id="projection" stroke="#c2185b" stroke-width="1.9" stroke-dasharray="6 5"/>
+            <circle id="projCircleX" cy="275" r="4.5" fill="#c2185b" opacity="0.85"/>
+
+            <!-- Vectores MCU -->
+            <line id="vCircle" stroke="#0062cc" stroke-width="5.5" stroke-linecap="round" marker-end="url(#blueTip)"/>
+            <g id="vCircleLabelGroup">
+              <text font-size="21" fill="#0062cc" text-anchor="middle" class="math">v<tspan dy="4" font-size="11.5" font-style="normal" font-weight="400">T</tspan></text>
+            </g>
+
+            <line id="aCircle" stroke="#0b8744" stroke-width="5.5" stroke-linecap="round" marker-end="url(#greenTip)"/>
+            <g id="aCircleLabelGroup">
+              <text font-size="21" fill="#0b8744" text-anchor="middle" class="math">a<tspan dy="4" font-size="11.5" font-style="normal" font-weight="400">c</tspan></text>
+            </g>
+
+            <circle id="particle" r="9.5" fill="#c2185b" stroke="#fff" stroke-width="2.3"/>
+            <text id="particleLabel" font-size="15.5" fill="#9c1048" font-weight="700">P</text>
+
+            <!-- SECCIÓN 2: MAS -->
+            <text x="24" y="476" font-size="20" font-weight="700" fill="#0f2942">2. Movimiento Armónico Simple (MAS)</text>
+            <text x="24" y="497" font-size="13.5" fill="#4a6785">Oscilador masa-resorte horizontal ideal</text>
+
+            <line x1="230" x2="730" y1="512" y2="512" stroke="#f2dede" stroke-width="1" stroke-dasharray="3 3"/>
+            <line x1="230" x2="730" y1="544" y2="544" stroke="#faebd7" stroke-width="1" stroke-dasharray="3 3"/>
+
+            <line id="aBlock" stroke="#d92b2b" stroke-width="5.5" stroke-linecap="round" marker-end="url(#redTip)"/>
+            <g id="aBlockLabelGroup">
+              <text font-size="21" fill="#d92b2b" text-anchor="middle" class="math">a<tspan dy="4" font-size="11.5" font-style="normal" font-weight="400">x</tspan></text>
+            </g>
+
+            <line id="vBlock" stroke="#e07400" stroke-width="5.5" stroke-linecap="round" marker-end="url(#orangeTip)"/>
+            <g id="vBlockLabelGroup">
+              <text font-size="21" fill="#e07400" text-anchor="middle" class="math">v<tspan dy="4" font-size="11.5" font-style="normal" font-weight="400">x</tspan></text>
+            </g>
+
+            <line x1="95" y1="612" x2="880" y2="612" stroke="#345573" stroke-width="3.5" marker-end="url(#axisTip)"/>
+            <text x="890" y="616" font-size="14" font-weight="700" fill="#345573">+x</text>
+            <rect x="108" y="552" width="14" height="60" fill="#51718a"/>
+            <path d="M108 556 l-10 -9 M108 568 l-10 -9 M108 580 l-10 -9 M108 592 l-10 -9 M108 604 l-10 -9" stroke="#51718a" stroke-width="2"/>
+
+            <path id="spring" stroke="#1565c0" fill="none" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+
+            <rect id="block" width="68" height="46" y="564" rx="6" fill="#d81b60" stroke="#880e4f" stroke-width="2"/>
+            <circle id="blockCM" cy="587" r="3.5" fill="#fff"/>
+            <text id="massLabel" y="582" fill="#fff" font-size="15.5" text-anchor="middle" font-weight="700" class="no-halo">m</text>
+
+            <!-- Elongación -->
+            <g id="elongationGroup">
+              <line id="elongation" stroke="#0062cc" stroke-width="3" marker-end="url(#blueTip)"/>
+              <circle id="elongStart" cx="480" cy="654" r="3.5" fill="#0062cc"/>
+              <text id="elongLabel" y="673" text-anchor="middle" font-size="13.5" fill="#0062cc" font-weight="700">x</text>
+            </g>
+
+            <!-- Amplitud -->
+            <g id="amplitudeGroup">
+              <line id="ampTickLeft" stroke="#855804" stroke-width="1.8"/>
+              <line id="ampTickRight" stroke="#855804" stroke-width="1.8"/>
+              <line id="amplitude" stroke="#855804" stroke-width="2.4" marker-start="url(#goldStart)" marker-end="url(#goldEnd)"/>
+              <text id="ampLabel" y="710" text-anchor="middle" font-size="13.5" fill="#855804" font-weight="700">A</text>
+            </g>
+          </svg>
+        </div>
+        <p class="scene-note">
+          Antes de soltar, el bloque y la partícula permanecen en su posición inicial y no se muestran vectores.
+           Tras iniciar, las flechas representan los vectores instantáneos con la escala indicada.
+        </p>
+      </section>
+    </div>
+
+    <!-- MENÚ LATERAL -->
+    <aside class="stage-side" aria-label="Menú de control">
+
+      <section class="card kin" aria-label="Relación cinemática">
+        <h2>Relación cinemática (MCU → MAS)</h2>
+        <p id="thetaOnScene" class="kin-main">Fase total: θ = ωt + φ₀</p>
+        <p id="deltaOnScene">Ángulo barrido: ωt</p>
+        <p id="phaseOnScene">Fase inicial: φ₀</p>
+        <hr>
+        <p class="kin-sub">Proyección sobre el diámetro X:</p>
+        <p class="eq c-x">x(t) = A cos(ωt + φ₀)</p>
+        <p class="eq c-v">v<sub>x</sub>(t) = −Aω sen(ωt + φ₀)</p>
+        <p class="eq c-a">a<sub>x</sub>(t) = −Aω² cos(ωt + φ₀)</p>
+        <hr>
+        <p id="scaleOnScene" class="scale">Geometría: 60 px por m · vectores: 12 px por m/s, 6 px por m/s²</p>
+      </section>
+
+      <section class="card ctrl" aria-label="Parámetros de la simulación">
+        <h2>Parámetros</h2>
+
+        <div class="row">
+          <div class="row-head"><label for="omega">Frecuencia angular ω</label><output id="omegaOut">1,0 rad/s</output></div>
+          <input id="omega" type="range" min="0.5" max="3" step="0.1" value="1">
+        </div>
+        <div class="row">
+          <label for="mode" class="cap">Condición inicial</label>
+          <select id="mode">
+            <option value="rest">Deformar y soltar (v₀ = 0)</option>
+            <option value="impulse">Deformar e impulsar (v₀ ≠ 0)</option>
+          </select>
+        </div>
+        <div class="row" id="rowX0">
+          <div class="row-head"><label for="x0">Deformación inicial x₀</label><output id="x0Val">+2,0 m</output></div>
+          <input id="x0" type="range" min="-3" max="3" step="0.1" value="2">
+          <div class="hint">Estirar (+) o comprimir (−). Al soltar desde reposo, la amplitud es A = |x₀|.</div>
+        </div>
+        <div class="row" id="rowAmp">
+          <div class="row-head"><label for="amp">Amplitud A</label><output id="ampVal">2,0 m</output></div>
+          <input id="amp" type="range" min="0" max="3" step="0.1" value="2">
+        </div>
+        <div class="row" id="rowPhase">
+          <div class="row-head"><label for="phase">Fase inicial φ₀</label><output id="phaseVal">0°</output></div>
+          <input id="phase" type="range" min="-180" max="180" step="5" value="0">
+          <div class="hint">x₀ = A cos φ₀ y v₀ = −Aω sen φ₀. Con φ₀ = ±90° el bloque pasa por el equilibrio con velocidad.</div>
+        </div>
+        <p class="hint" id="modeHint" aria-live="polite"></p>
+        <p class="hint" style="margin-top:4px">Resultado: amplitud <output id="ampOut">2,0 m</output> · deformación x₀ <output id="x0Out">+2,0 m</output> · velocidad v₀ <output id="v0Out">0,0 m/s</output> · fase φ₀ <output id="phaseOut">0°</output></p>
+
+        <div class="actions">
+          <button id="play" type="button">Soltar ▶</button>
+          <button id="step" type="button" class="secondary">+0,10 s</button>
+          <button id="reset" type="button" class="secondary">Reiniciar</button>
+        </div>
+        <span id="status" class="status" aria-live="polite">Preparado: posición sujeta</span>
+      </section>
+
+      <section class="card ctrl" aria-label="Elementos visibles">
+        <h2>Mostrar en la escena</h2>
+        <div class="toggles">
+          <label class="toggle"><input id="showVMCU" type="checkbox" checked><span class="swatch" style="background:var(--blue)"></span>v<sub>T</sub> MCU</label>
+          <label class="toggle"><input id="showAMCU" type="checkbox" checked><span class="swatch" style="background:var(--green)"></span>a<sub>c</sub> MCU</label>
+          <label class="toggle"><input id="showVMAS" type="checkbox" checked><span class="swatch" style="background:var(--orange)"></span>v<sub>x</sub> MAS</label>
+          <label class="toggle"><input id="showAMAS" type="checkbox" checked><span class="swatch" style="background:var(--red)"></span>a<sub>x</sub> MAS</label>
+          <label class="toggle"><input id="showProjection" type="checkbox" checked>Proyección</label>
+          <label class="toggle"><input id="showAmp" type="checkbox" checked>Amplitud</label>
+          <label class="toggle"><input id="showExtremes" type="checkbox" checked>Límites ±A</label>
+        </div>
+      </section>
+
+    </aside>
+  </div>
+
+  <!-- LECTURAS -->
+  <section class="card" aria-label="Lecturas numéricas">
+    <h2>Lecturas</h2>
+    <div class="metrics">
+      <div class="metric"><small>Amplitud (A)</small><strong id="readA">2,00 m</strong></div>
+      <div class="metric"><small>Posición inicial (x₀)</small><strong id="readX0">+2,00 m</strong></div>
+      <div class="metric"><small>v₀ al liberar</small><strong id="readV0">0,00 m/s</strong></div>
+      <div class="metric"><small>Tiempo (t)</small><strong id="readT">0,00 s</strong></div>
+      <div class="metric"><small>Fase actual (θ)</small><strong id="readTheta">0,0°</strong></div>
+      <div class="metric"><small>Ángulo barrido (ωt)</small><strong id="readDelta">0,0°</strong></div>
+      <div class="metric"><small>Elongación (x)</small><strong id="readX">+2,00 m</strong></div>
+      <div class="metric"><small>Velocidad real (vₓ)</small><strong id="readV">0,00 m/s</strong></div>
+      <div class="metric"><small>Aceleración real (aₓ)</small><strong id="readAcc">0,00 m/s²</strong></div>
+      <div class="metric"><small>Período (T)</small><strong id="readPeriod">6,28 s</strong></div>
+      <div class="metric"><small>a₀ al liberar</small><strong id="readA0">−4,00 m/s²</strong></div>
+      <div class="metric"><small>Estado</small><strong id="readState">Sujeto (t = 0)</strong></div>
+    </div>
+  </section>
+
+  <!-- FÓRMULAS -->
+  <section class="card" aria-label="Fórmulas">
+    <h2>Fórmulas</h2>
+    <div class="formulas">
+      <div class="formula">x(t) = A cos(ωt + φ₀)</div>
+      <div class="formula">v<sub>x</sub>(t) = −Aω sen(ωt + φ₀)</div>
+      <div class="formula">a<sub>x</sub>(t) = −ω² x(t)</div>
+      <div class="formula">v<sub>máx</sub> = Aω</div>
+      <div class="formula">a<sub>máx</sub> = Aω²</div>
+      <div class="formula">T = 2π / ω</div>
+    </div>
+    <p class="note">
+       <b>Condición inicial:</b> la amplitud depende de la deformación y de la velocidad inicial: A = √(x₀² + (v₀/ω)²). Si se suelta desde reposo (v₀ = 0), la amplitud coincide con la deformación, A = |x₀|. Con velocidad inicial, la amplitud puede ser mayor o menor que la deformación. La fase φ₀ se obtiene de x₀ y v₀. Si x₀ = 0 y v₀ = 0, el resorte está en equilibrio y no oscila.
+    </p>
+    <p class="note">
+      <b>Fundamento geométrico:</b> el radio de la circunferencia del MCU es igual a la amplitud del MAS (R = A).
+      La proyección horizontal de la velocidad tangencial <span class="c-vt"><span class="math">v</span><sub>T</sub></span>
+      coincide con <span style="color:var(--orange)"><span class="math">v</span><sub>x</sub></span>, y la proyección horizontal de la
+      aceleración centrípeta <span class="c-ac"><span class="math">a</span><sub>c</sub></span> coincide con
+      <span style="color:var(--red)"><span class="math">a</span><sub>x</sub></span>. Por ello el MAS es la sombra del MCU.
+    </p>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+
+  // Geometría y escala fija de vectores (px por m/s y px por m/s²)
+  const X = 480, Y = 275, SCALE = 60;
+  const K_V = 12, K_A = 6;
+  const MIN_VECTOR = 8;
+
+  let t = 0, playing = false, started = false, last = null;
+
+  const f = (x, d = 2) => (Math.abs(x) < 1e-9 ? 0 : x).toFixed(d).replace('.', ',');
+  const fSign = (x, d = 2) => {
+    const val = Math.abs(x) < 1e-9 ? 0 : x;
+    const sign = val > 0 ? '+' : (val < 0 ? '−' : '');
+    return sign + Math.abs(val).toFixed(d).replace('.', ',');
+  };
+  const rad = d => d * Math.PI / 180;
+  const deg = r => r * 180 / Math.PI;
+  const norm = d => ((d % 360) + 360) % 360;
+
+  function setLine(id, x1, y1, x2, y2) {
+    const e = $(id);
+    e.setAttribute('x1', x1); e.setAttribute('y1', y1);
+    e.setAttribute('x2', x2); e.setAttribute('y2', y2);
+  }
+
+  function showElem(id, visible) {
+    $(id).style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  function drawVector(lineId, groupId, x, y, dx, dy, show, startOffset = 0, mode = 'auto') {
+    const mag = Math.hypot(dx, dy);
+    const visible = show && mag >= MIN_VECTOR;
+    showElem(lineId, visible);
+    showElem(groupId, visible);
+    if (!visible) return;
+
+    const ux = dx / mag, uy = dy / mag;
+    const x2 = x + dx, y2 = y + dy;
+    // El origen NUNCA debe rebasar la punta. Antes, una flecha de 6 px
+    // con separación inicial de 9,5 px aparecía invertida.
+    const safeOffset = Math.min(Math.max(startOffset, 0), mag * 0.15);
+    setLine(lineId, x + ux * safeOffset, y + uy * safeOffset, x2, y2);
+
+    let lx, ly;
+    if (mode === 'horizontal') {
+      lx = x2 + (dx >= 0 ? 12 : -12);
+      ly = y2 - 10;
+    } else if (mode === 'centripetal') {
+      const nx = -uy, ny = ux;
+      lx = x2 - ux * 10 + nx * 17;
+      ly = y2 - uy * 10 + ny * 17 + 4;
+    } else {
+      lx = x2 + ux * 17;
+      ly = y2 + uy * 17 + 5;
+    }
+    $(groupId).setAttribute('transform', `translate(${lx.toFixed(1)}, ${ly.toFixed(1)})`);
+  }
+
+  function springPath(to) {
+    const from = 122, y = 587, lead = 16, n = 14;
+    const step = (to - from - 2 * lead) / n;
+    let d = `M${from} ${y} L${from + lead} ${y}`;
+    for (let i = 0; i < n; i++) {
+      const x = from + lead + i * step;
+      d += ` L${x + step * 0.25} ${y - 13} L${x + step * 0.75} ${y + 13} L${x + step} ${y}`;
+    }
+    return d + ` L${to} ${y}`;
+  }
+
+  // Soltado desde reposo: v₀ = 0, por lo que la fase debe ser 0° o 180° y A es la posición de soltado.
+  // Fase libre: A y φ₀ son independientes, y v₀ = −Aω sen φ₀.
+  function state() {
+    const w = +$('omega').value;
+    // Modo "Deformar e impulsar": A y φ₀ son las entradas; x₀ = A cos φ₀ y v₀ = −Aω sen φ₀.
+    // Modo "Deformar y soltar": x₀ es la entrada; v₀ = 0, A = |x₀| y φ₀ = 0° o 180°.
+    let A, phi;
+    if ($('mode').value === 'impulse') {
+      A = +$('amp').value;
+      phi = rad(+$('phase').value);
+    } else {
+      const x0in = +$('x0').value;
+      A = Math.abs(x0in);
+      phi = x0in < 0 ? Math.PI : 0;
+    }
+    // Escala ajustada para que la circunferencia siempre quepa en la escena
+    const sc = A > 1e-9 ? Math.min(SCALE, 170 / A) : SCALE;
+    const theta = phi + w * t;
+    const x = A * Math.cos(theta);
+    const v = -A * w * Math.sin(theta);
+    const a = -w * w * x;
+    const r = A * sc;
+    return {
+      A, w, phi, theta, x, v, a, r,
+      px: X + r * Math.cos(theta),
+      py: Y - r * Math.sin(theta),
+      x0: A * Math.cos(phi),
+      v0: -A * w * Math.sin(phi)
+    };
+  }
+
+  function render() {
+    const s = state();
+    const { A, w, theta, x, v, a, r, px, py, x0, v0 } = s;
+    // Sin velocidad inicial = soltado desde reposo; con φ₀ distinta de 0° o 180° hay velocidad inicial.
+    const rest = Math.abs(v0) < 1e-9;
+
+    // 1. Circunferencia y ejes
+    $('circle').setAttribute('r', r);
+    setLine('axisX', X - r - 30, Y, X + r + 34, Y);
+    setLine('axisY', X, Y + r + 24, X, Y - r - 28);
+    $('axisXLabel').setAttribute('x', X + r + 42);
+    $('axisXLabel').setAttribute('y', Y + 4);
+    $('axisYLabel').setAttribute('x', X);
+    $('axisYLabel').setAttribute('y', Y - r - 34);
+
+    // 2. Flecha curva de ω (sentido antihorario)
+    const rOmega = r + 18;
+    const a1 = rad(32), a2 = rad(64);
+    $('omegaArc').setAttribute('d',
+      `M ${X + rOmega * Math.cos(a1)} ${Y - rOmega * Math.sin(a1)} ` +
+      `A ${rOmega} ${rOmega} 0 0 0 ${X + rOmega * Math.cos(a2)} ${Y - rOmega * Math.sin(a2)}`);
+    const aMid = rad(48);
+    $('omegaArcLabel').setAttribute('x', X + (rOmega + 14) * Math.cos(aMid));
+    $('omegaArcLabel').setAttribute('y', Y - (rOmega + 14) * Math.sin(aMid) + 5);
+
+    // 3. Radio y partícula
+    setLine('radius', X, Y, px, py);
+    $('particle').setAttribute('cx', px);
+    $('particle').setAttribute('cy', py);
+    const ux = Math.cos(theta), uy = -Math.sin(theta);
+    $('particleLabel').setAttribute('x', px + ux * 21);
+    $('particleLabel').setAttribute('y', py + uy * 21 + 5);
+    $('particleLabel').setAttribute('text-anchor', 'middle');
+
+    const nx = Math.sin(theta), ny = Math.cos(theta);
+    $('radLabel').setAttribute('x', X + ux * (r * 0.36) - nx * 15);
+    $('radLabel').setAttribute('y', Y + uy * (r * 0.36) - ny * 15 + 5);
+    $('radLabel').setAttribute('text-anchor', 'middle');
+
+    // 4. Sector angular θ
+    const normDeg = norm(deg(theta));
+    const aa = rad(normDeg);
+    const rArc = 32;
+    if (normDeg > 2 && A > 0) {
+      let path = `M ${X} ${Y} L ${X + rArc} ${Y}`;
+      const steps = 36;
+      for (let i = 1; i <= steps; i++) {
+        const b = -aa * i / steps;
+        path += ` L ${X + rArc * Math.cos(b)} ${Y + rArc * Math.sin(b)}`;
+      }
+      $('arc').setAttribute('d', path);
+      const half = -aa / 2;
+      $('thetaArcLabel').setAttribute('x', X + (rArc + 14) * Math.cos(half));
+      $('thetaArcLabel').setAttribute('y', Y + (rArc + 14) * Math.sin(half) + 4);
+      $('thetaArcLabel').setAttribute('text-anchor', 'middle');
+      showElem('arc', true);
+      showElem('thetaArcLabel', true);
+    } else {
+      showElem('arc', false);
+      showElem('thetaArcLabel', false);
+    }
+
+    // 4b. Ángulo inicial φ₀ (con signo: negativo = sentido horario)
+    const p0 = deg(s.phi);
+    const a0 = rad(p0);
+    const phi0X = X + r * Math.cos(a0);
+    const phi0Y = Y - r * Math.sin(a0);
+    setLine('phi0Line', X, Y, phi0X, phi0Y);
+    showElem('phi0Line', A > 0);
+    showElem('phi0Dot', A > 0);
+    showElem('phi0ArcLabel', A > 0);
+    $('phi0Dot').setAttribute('cx', phi0X);
+    $('phi0Dot').setAttribute('cy', phi0Y);
+
+    const rPhi = 50;
+    if (Math.abs(p0) > 2 && A > 0) {
+      let path = `M ${X} ${Y} L ${X + rPhi} ${Y}`;
+      const steps = 36;
+      for (let i = 1; i <= steps; i++) {
+        const b = a0 * i / steps;
+        path += ` L ${X + rPhi * Math.cos(b)} ${Y - rPhi * Math.sin(b)}`;
+      }
+      $('phi0Arc').setAttribute('d', path);
+      showElem('phi0Arc', true);
+    } else {
+      showElem('phi0Arc', false);
+    }
+    // Si la etiqueta cae sobre el eje horizontal, se desplaza hacia abajo para no tapar el radio
+    const midPhi = a0 / 2, rLabPhi = 72;
+    const onAxis = Math.abs(Math.sin(midPhi)) < 0.2;
+    $('phi0ArcLabel').setAttribute('x', X + rLabPhi * Math.cos(midPhi));
+    $('phi0ArcLabel').setAttribute('y', Y - rLabPhi * Math.sin(midPhi) + (onAxis ? 20 : 5));
+    $('phi0ArcLabel').setAttribute('text-anchor', 'middle');
+    $('phi0ArcLabel').textContent = `φ₀ = ${fSign(p0, 0)}°`;
+
+    // 5. Cuadro cinemático
+    $('thetaOnScene').textContent = `Fase total: θ = ${f(normDeg, 1)}°`;
+    $('deltaOnScene').textContent = `Ángulo barrido: ωt = ${f(deg(w * t), 1)}°`;
+    $('phaseOnScene').textContent = `Fase inicial: φ₀ = ${f(deg(s.phi), 0)}°`;
+    $('scaleOnScene').textContent = `Geometría: ${A > 1e-9 ? f(r / A, 0) : f(SCALE, 0)} px por m · vectores: ${K_V} px por m/s, ${K_A} px por m/s²`;
+
+    // 6. Línea proyectante
+    const showProj = $('showProjection').checked;
+    setLine('projection', px, py, px, 587);
+    $('projCircleX').setAttribute('cx', px);
+    showElem('projection', showProj);
+    showElem('projCircleX', showProj);
+
+    // 7. Bloque y resorte
+    const blockLeft = px - 34;
+    $('block').setAttribute('x', blockLeft);
+    $('blockCM').setAttribute('cx', px);
+    $('massLabel').setAttribute('x', px);
+    $('spring').setAttribute('d', springPath(blockLeft));
+
+    // 8. Límites ±A
+    setLine('leftExtreme', X - r, Y, X - r, 618);
+    setLine('rightExtreme', X + r, Y, X + r, 618);
+    $('leftCircleTouch').setAttribute('cx', X - r);
+    $('leftCircleTouch').setAttribute('cy', Y);
+    $('rightCircleTouch').setAttribute('cx', X + r);
+    $('rightCircleTouch').setAttribute('cy', Y);
+    $('leftCircleText').setAttribute('x', X - r - 8);
+    $('leftCircleText').setAttribute('y', Y - 10);
+    $('leftCircleText').setAttribute('text-anchor', 'end');
+    $('rightCircleText').setAttribute('x', X + r + 8);
+    $('rightCircleText').setAttribute('y', Y - 10);
+    $('rightCircleText').setAttribute('text-anchor', 'start');
+    $('leftLabel').setAttribute('x', X - r);
+    $('rightLabel').setAttribute('x', X + r);
+    showElem('extremes', $('showExtremes').checked);
+
+    // 9. Elongación x
+    const elongPx = px - X;
+    const showElong = Math.abs(elongPx) >= 8;
+    if (showElong) setLine('elongation', X, 654, px, 654);
+    showElem('elongation', showElong);
+    showElem('elongStart', true);
+    $('elongLabel').setAttribute('x', (X + px) / 2);
+    $('elongLabel').textContent = `x = ${fSign(x)} m`;
+
+    // 10. Cota de amplitud
+    setLine('amplitude', X + 2, 692, X + r - 2, 692);
+    setLine('ampTickLeft', X, 683, X, 701);
+    setLine('ampTickRight', X + r, 683, X + r, 701);
+    $('ampLabel').setAttribute('x', X + r / 2);
+    $('ampLabel').textContent = `A = ${f(A, 1)} m`;
+    showElem('amplitudeGroup', $('showAmp').checked && A > 0);
+
+    // 11. Vectores con escala fija: la proyección horizontal del MCU coincide con el MAS
+    const vxPx = -Math.sin(theta) * A * w * K_V;
+    const vyPx = -Math.cos(theta) * A * w * K_V;
+    const axPx = -Math.cos(theta) * A * w * w * K_A;
+    const ayPx =  Math.sin(theta) * A * w * w * K_A;
+
+    drawVector('vCircle', 'vCircleLabelGroup', px, py, vxPx, vyPx, $('showVMCU').checked && started, 9.5, 'auto');
+    drawVector('aCircle', 'aCircleLabelGroup', px, py, axPx, ayPx, $('showAMCU').checked && started, 9.5, 'centripetal');
+    drawVector('vBlock', 'vBlockLabelGroup', px, 544, vxPx, 0, $('showVMAS').checked && started, 0, 'horizontal');
+    drawVector('aBlock', 'aBlockLabelGroup', px, 512, axPx, 0, $('showAMAS').checked && started, 0, 'horizontal');
+
+    // 12. Lecturas
+    $('ampOut').textContent = f(A, 1) + ' m';
+    $('x0Out').textContent = fSign(x0, 1) + ' m';
+    $('v0Out').textContent = fSign(v0, 1) + ' m/s';
+    $('x0Val').textContent = fSign(+$('x0').value, 1) + ' m';
+    $('ampVal').textContent = f(+$('amp').value, 1) + ' m';
+    $('phaseVal').textContent = fSign(+$('phase').value, 0) + '°';
+    $('omegaOut').textContent = f(w, 1) + ' rad/s';
+    $('phaseOut').textContent = fSign(p0, 0) + '°';
+
+    $('readA').textContent = f(A) + ' m';
+    $('readX0').textContent = fSign(x0) + ' m';
+    $('readV0').textContent = fSign(v0) + ' m/s';
+    $('readT').textContent = f(t) + ' s';
+    $('readTheta').textContent = f(normDeg, 1) + '°';
+    $('readDelta').textContent = f(deg(w * t), 1) + '°';
+    $('readX').textContent = fSign(x) + ' m';
+    $('readV').textContent = started ? fSign(v) + ' m/s' : '0,00 m/s';
+    $('readAcc').textContent = started ? fSign(a) + ' m/s²' : '0,00 m/s²';
+    $('readPeriod').textContent = f(2 * Math.PI / w) + ' s';
+    $('readA0').textContent = fSign(-w * w * x0) + ' m/s²';
+    $('readState').textContent = started ? (playing ? 'Oscilando' : 'Pausado') : 'Sujeto (t = 0)';
+
+    const eq = A < 1e-9;
+    $('play').disabled = eq;
+    const impulse = $('mode').value === 'impulse';
+    $('modeHint').textContent = eq
+      ? 'Sin deformación (A = 0): el resorte está en equilibrio y no oscila.'
+      : !rest
+        ? `Con velocidad inicial: x₀ = ${fSign(x0)} m, v₀ = ${fSign(v0)} m/s.`
+        : impulse
+          ? `Sin velocidad inicial (φ₀ = ${f(p0, 0)}°): x₀ = ${fSign(x0)} m y v₀ = 0.`
+          : `Soltado desde reposo: x₀ = ${fSign(x0)} m, v₀ = 0.`;
+    if (!started) {
+      $('status').textContent = eq
+        ? 'Equilibrio: no hay deformación, por eso no hay movimiento.'
+        : rest
+          ? `SUJETO: x₀ = ${fSign(x0)} m · v = 0 · listo para soltar`
+          : `SUJETO: x₀ = ${fSign(x0)} m · al iniciar v₀ = ${fSign(v0)} m/s`;
+    }
+    if (eq) $('readState').textContent = 'Equilibrio';
+  }
+
+  function updateModeUI() {
+    const imp = $('mode').value === 'impulse';
+    $('rowX0').style.display = imp ? 'none' : '';
+    $('rowAmp').style.display = imp ? '' : 'none';
+    $('rowPhase').style.display = imp ? '' : 'none';
+  }
+
+  function prepare() {
+    t = 0;
+    playing = false;
+    started = false;
+    last = null;
+    $('play').textContent = 'Soltar ▶';
+    render();
+  }
+
+  $('x0').addEventListener('input', prepare);
+  $('amp').addEventListener('input', prepare);
+  $('phase').addEventListener('input', prepare);
+  $('mode').addEventListener('change', () => { updateModeUI(); prepare(); });
+  $('omega').addEventListener('input', prepare);
+
+  ['showVMCU', 'showAMCU', 'showVMAS', 'showAMAS', 'showProjection', 'showAmp', 'showExtremes']
+    .forEach(id => $(id).addEventListener('change', render));
+
+  $('play').addEventListener('click', () => {
+    started = true;
+    playing = !playing;
+    last = null;
+    $('play').textContent = playing ? 'Pausar ⏸' : 'Continuar ▶';
+    $('status').textContent = playing ? 'MCU y MAS en movimiento' : 'Pausa: instante congelado';
+    render();
+  });
+
+  $('step').addEventListener('click', () => {
+    started = true;
+    playing = false;
+    last = null;
+    t += 0.1;
+    $('play').textContent = 'Continuar ▶';
+    $('status').textContent = `Avance paso a paso (t = ${f(t)} s)`;
+    render();
+  });
+
+  $('reset').addEventListener('click', prepare);
+
+  function frame(now) {
+    if (last === null) last = now;
+    const dt = Math.min(0.04, (now - last) / 1000);
+    last = now;
+    if (playing) {
+      t += dt;
+      render();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  updateModeUI();
+  prepare();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
