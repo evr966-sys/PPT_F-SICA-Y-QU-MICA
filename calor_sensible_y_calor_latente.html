@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Calor sensible y calor latente - Animación 3D</title>
+<style>
+  :root{
+    --bg:#f5f8fc; --ink:#10233f; --blue:#1769d2; --cyan:#49b8ff;
+    --orange:#f28c28; --red:#d94432; --card:#ffffffdd; --line:#cfd9e7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(#f8fbff,#eef4fb);color:var(--ink);overflow:hidden}
+  #app{height:100vh;display:grid;grid-template-rows:auto 1fr auto;gap:8px;padding:10px}
+  header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--card);border:1px solid #dbe5f0;border-radius:16px;box-shadow:0 6px 24px #7892aa18}
+  header h1{margin:0;font-size:clamp(20px,2.2vw,34px);letter-spacing:.2px}
+  header .legend{display:flex;gap:10px;flex-wrap:wrap;font-weight:700;font-size:14px}
+  .pill{padding:6px 10px;border-radius:999px;border:1px solid #d9e3ee;background:#fff}
+  .pill.sensible{color:var(--blue);border-color:#9fc9ff;background:#edf6ff}
+  .pill.latente{color:#b85e00;border-color:#ffc078;background:#fff4e8}
+  main{min-height:0;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(330px,.9fr);gap:10px}
+  .panel{position:relative;min-height:0;background:var(--card);border:1px solid #dbe5f0;border-radius:18px;overflow:hidden;box-shadow:0 8px 26px #7892aa18}
+  #sceneWrap{position:relative}
+  #scene{width:100%;height:100%;display:block}
+  #hud{position:absolute;left:14px;top:14px;right:14px;display:flex;justify-content:space-between;pointer-events:none}
+  .readout{background:#ffffffec;border:1px solid #d8e3ef;border-radius:14px;padding:10px 13px;box-shadow:0 5px 18px #375a7a1a;min-width:170px}
+  .readout .big{font-size:26px;font-weight:800}
+  .readout small{display:block;color:#5d7087;margin-top:3px}
+  #stageBadge{font-weight:800;font-size:17px}
+  #stageBadge.sensible{color:var(--blue)}
+  #stageBadge.latente{color:#c86a00}
+  #equation{font-size:22px;font-weight:800;margin-top:2px}
+  #thermo{position:absolute;right:14px;bottom:14px;width:42px;height:240px;background:#fff;border:2px solid #607286;border-radius:22px;padding:5px;box-shadow:0 5px 18px #375a7a1a}
+  #thermoTube{position:absolute;left:50%;transform:translateX(-50%);bottom:19px;width:10px;height:198px;background:#eef2f6;border:1px solid #9aa8b8;border-radius:8px;overflow:hidden}
+  #mercury{position:absolute;left:0;right:0;bottom:0;height:0%;background:linear-gradient(#ff5d42,#d9231f);border-radius:7px;transition:height .08s linear}
+  #thermoBulb{position:absolute;width:22px;height:22px;left:50%;transform:translateX(-50%);bottom:4px;background:#d9231f;border-radius:50%;border:2px solid #9e1613}
+  #thermoLabel{position:absolute;top:3px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:800}
+  #side{display:grid;grid-template-rows:auto 1fr auto;gap:8px;padding:12px}
+  #curveCard{border:1px solid #dbe5f0;border-radius:14px;background:#fff;padding:8px;min-height:0}
+  #curve{width:100%;height:100%;min-height:250px;display:block}
+  #stageInfo{border:1px solid #dbe5f0;border-radius:14px;background:#fff;padding:12px}
+  #stageInfo h2{margin:0 0 6px;font-size:21px}
+  #stageInfo p{margin:0;color:#4d6075;line-height:1.35}
+  #stageInfo .formula{margin-top:8px;font-weight:800;font-size:22px}
+  .contextNote{display:block;margin-top:6px;color:#66798d;font-size:11px}
+  #progressRow{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+  .seg{height:9px;border-radius:10px;background:#dce5ef;overflow:hidden;position:relative}
+  .seg.sensible.active{background:#7bbcff}.seg.latente.active{background:#ffb15a}
+  footer{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--card);border:1px solid #dbe5f0;border-radius:16px;box-shadow:0 6px 24px #7892aa18}
+  button{border:0;border-radius:12px;padding:9px 14px;font-weight:800;cursor:pointer;background:#123d6b;color:#fff}
+  button.secondary{background:#e8eef5;color:#183754}
+  input[type=range]{flex:1;min-width:90px;accent-color:#1769d2}
+  select{border:1px solid #ccd7e5;border-radius:10px;padding:8px;background:white;font-weight:700;color:#183754}
+  #timeTxt{min-width:70px;text-align:right;font-variant-numeric:tabular-nums;font-weight:800}
+  @media(max-width:600px){footer{flex-wrap:wrap}input[type=range]{flex-basis:100%;order:2}#timeTxt{margin-left:auto}}
+  @media(max-width:900px){
+    body{overflow:auto} #app{height:auto;min-height:100vh} main{grid-template-columns:1fr;grid-template-rows:58vh auto} #side{min-height:520px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Calor sensible y calor latente</h1>
+    <div class="legend"><span class="pill sensible">Calor sensible</span><span class="pill latente">Calor latente</span></div>
+  </header>
+  <main>
+    <section class="panel" id="sceneWrap">
+      <canvas id="scene"></canvas>
+      <div id="hud">
+        <div class="readout">
+          <div id="stageBadge" class="sensible">Calor sensible</div>
+          <div id="equation">Q = mcΔT</div>
+          <small id="phaseTxt">Hielo: aumenta la temperatura</small>
+        </div>
+        <div class="readout" style="text-align:right">
+          <div class="big"><span id="tempTxt">−20</span> °C</div>
+          <small id="stateTxt">Sólido</small>
+        </div>
+      </div>
+      <div id="thermo">
+        <div id="thermoLabel">°C</div>
+        <div id="thermoTube"><div id="mercury"></div></div><div id="thermoBulb"></div>
+      </div>
+    </section>
+
+    <aside class="panel" id="side">
+      <div id="progressRow">
+        <div class="seg sensible" data-seg="0"></div><div class="seg latente" data-seg="1"></div><div class="seg sensible" data-seg="2"></div><div class="seg latente" data-seg="3"></div><div class="seg sensible" data-seg="4"></div>
+      </div>
+      <div id="curveCard"><canvas id="curve"></canvas></div>
+      <div id="stageInfo">
+        <h2 id="stageTitle">1. Calentamiento del hielo</h2>
+        <p id="stageDesc">El hielo absorbe calor y su temperatura aumenta hasta 0 °C. No cambia de estado.</p>
+        <div class="formula" id="formulaTxt">Q = mcΔT</div>
+        <small class="contextNote">Modelo esquemático del agua a presión atmosférica.</small>
+      </div>
+    </aside>
+  </main>
+  <footer>
+    <button id="playBtn">Pausa</button>
+    <button class="secondary" id="restartBtn">Reiniciar</button>
+    <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Línea de tiempo" />
+    <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+    <div id="timeTxt">0.0 s</div>
+  </footer>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
+
+const canvas = document.getElementById('scene');
+const wrap = document.getElementById('sceneWrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf7fbff);
+const camera = new THREE.PerspectiveCamera(42,1,0.1,100);
+camera.position.set(5.8,4.4,7.8); camera.lookAt(0,1.4,0);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x9fb4c7,2.2));
+const key = new THREE.DirectionalLight(0xffffff,2.6); key.position.set(5,7,5); key.castShadow=true; scene.add(key);
+const rim = new THREE.DirectionalLight(0x86c5ff,1.4); rim.position.set(-5,3,-4); scene.add(rim);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14,10), new THREE.MeshStandardMaterial({color:0xe8edf3,roughness:.72,metalness:.02}));
+floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+
+// burner
+const burner = new THREE.Group(); scene.add(burner); burner.position.y=.05;
+const base = new THREE.Mesh(new THREE.CylinderGeometry(.7,.85,.18,48), new THREE.MeshStandardMaterial({color:0x5d6470,metalness:.8,roughness:.25})); base.castShadow=true; burner.add(base);
+const stem = new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,1.15,32), new THREE.MeshStandardMaterial({color:0x727b87,metalness:.85,roughness:.2})); stem.position.y=.65; stem.castShadow=true; burner.add(stem);
+const flameMat = new THREE.MeshBasicMaterial({color:0x2a8cff,transparent:true,opacity:.85});
+const flame = new THREE.Mesh(new THREE.ConeGeometry(.25,1.0,32),flameMat); flame.position.y=1.55; burner.add(flame);
+
+// tripod + gauze
+const tripod = new THREE.Group(); scene.add(tripod);
+for (const x of [-.9,.9]) for (const z of [-.75,.75]) { const leg=new THREE.Mesh(new THREE.CylinderGeometry(.035,.04,2.25,12),new THREE.MeshStandardMaterial({color:0x5f6670,metalness:.8,roughness:.3})); leg.position.set(x*.72,1.2,z*.65); leg.rotation.z=x>0?.13:-.13; leg.castShadow=true; tripod.add(leg); }
+const meshTop = new THREE.Mesh(new THREE.BoxGeometry(2.5,.06,2.2),new THREE.MeshStandardMaterial({color:0x646b74,wireframe:true,metalness:.5,roughness:.4})); meshTop.position.y=2.25; tripod.add(meshTop);
+
+// beaker: transparent cylinder with open top visual
+const beaker = new THREE.Group(); scene.add(beaker); beaker.position.y=2.28;
+const glassMat = new THREE.MeshPhysicalMaterial({color:0xdaf2ff,transparent:true,opacity:.22,roughness:.05,metalness:0,transmission:.92,thickness:.03,side:THREE.DoubleSide});
+const wall = new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.0,2.6,64,1,true),glassMat); wall.position.y=1.3; beaker.add(wall);
+const bottom = new THREE.Mesh(new THREE.CylinderGeometry(1.0,1.0,.08,64),glassMat); bottom.position.y=.02; beaker.add(bottom);
+const rim1 = new THREE.Mesh(new THREE.TorusGeometry(1.2,.04,12,64),new THREE.MeshStandardMaterial({color:0xbad4e8,metalness:.1,roughness:.18,transparent:true,opacity:.85})); rim1.rotation.x=Math.PI/2; rim1.position.y=2.6; beaker.add(rim1);
+
+const waterMat = new THREE.MeshPhysicalMaterial({color:0x5cbcff,transparent:true,opacity:.56,roughness:.12,metalness:0,transmission:.55,thickness:.2});
+const liquid = new THREE.Mesh(new THREE.CylinderGeometry(1.0,.92,1.85,64),waterMat); liquid.position.y=.94; liquid.visible=false; beaker.add(liquid);
+const surface = new THREE.Mesh(new THREE.CircleGeometry(1.0,64),new THREE.MeshPhysicalMaterial({color:0x8fd2ff,transparent:true,opacity:.7,roughness:.08})); surface.rotation.x=-Math.PI/2; surface.position.y=1.87; surface.visible=false; beaker.add(surface);
+
+// steam cloud particles
+const vaporGroup = new THREE.Group(); beaker.add(vaporGroup);
+const vaporMat = new THREE.MeshStandardMaterial({color:0xeef6ff,transparent:true,opacity:.0,roughness:.5});
+for(let i=0;i<32;i++){
+  const p=new THREE.Mesh(new THREE.SphereGeometry(.07+Math.random()*.05,12,12),vaporMat);
+  p.userData={r:.25+Math.random()*.75,a:Math.random()*Math.PI*2,s:.7+Math.random()*1.2,y:1.6+Math.random()*2.2};
+  vaporGroup.add(p);
+}
+
+// molecules/particles
+const particles=[]; const pgroup=new THREE.Group(); beaker.add(pgroup);
+const solidMat = new THREE.MeshStandardMaterial({color:0xbfe4ff,roughness:.28,metalness:.03});
+
+
+const N=90;
+for(let i=0;i<N;i++){
+  const m=new THREE.Mesh(new THREE.SphereGeometry(.075,12,12),solidMat.clone());
+  m.castShadow=true; particles.push(m); pgroup.add(m);
+}
+function setLattice(){
+  let i=0; const xs=[-.62,-.31,0,.31,.62], zs=[-.5,-.25,0,.25,.5], ys=[.18,.42,.66,.90];
+  for(const y of ys) for(const x of xs) for(const z of zs){
+    if(i>=N) break;
+    if(x*x+z*z<.82){particles[i].position.set(x,y,z);i++;}
+  }
+  for(;i<N;i++) particles[i].position.set((i%7-3)*.13,.22+(i%9)*.075,(Math.floor(i/7)%7-3)*.12);
+  particles.forEach(p=>p.userData.solid=p.position.clone());
+}
+setLattice();
+
+// Three translucent ice blocks make the initial solid state recognizable.
+const iceCubes=new THREE.Group(); beaker.add(iceCubes);
+const iceMaterial=new THREE.MeshPhysicalMaterial({color:0xc7eaff,transparent:true,opacity:.50,roughness:.13,transmission:.35,thickness:.35});
+[[-.38,.49,-.24,.13],[.34,.49,.20,-.12],[-.01,1.18,.01,.27]].forEach(([x,y,z,r])=>{
+  const cube=new THREE.Mesh(new THREE.BoxGeometry(.78,.78,.78),iceMaterial);
+  cube.position.set(x,y,z);cube.rotation.y=r;cube.castShadow=true;iceCubes.add(cube);
+});
+
+// heat arrows rising from flame
+const arrows=[]; const arrowGroup=new THREE.Group(); scene.add(arrowGroup);
+for(let i=0;i<8;i++){
+  const curve=new THREE.CatmullRomCurve3([new THREE.Vector3((i-3.5)*.12,1.3,0),new THREE.Vector3((i-3.5)*.16,1.85,0),new THREE.Vector3((i-3.5)*.12,2.2,0)]);
+  const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,14,.018,8,false),new THREE.MeshBasicMaterial({color:0xff7a21,transparent:true,opacity:.75}));
+  tube.userData.phase=i/8; arrows.push(tube); arrowGroup.add(tube);
+}
+
+// labels in scene via sprites
+function makeTextSprite(text,color='#10233f',scale=1){
+  const c=document.createElement('canvas'); c.width=512;c.height=128; const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);ctx.font='700 56px Segoe UI,Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.fillText(text,c.width/2,c.height/2);
+  const tex=new THREE.CanvasTexture(c); const mat=new THREE.SpriteMaterial({map:tex,transparent:true}); const s=new THREE.Sprite(mat);s.scale.set(3.3*scale,.83*scale,1);return s;
+}
+const qLabel=makeTextSprite('Q', '#df4c1f', .8); qLabel.position.set(0,1.85,1.45); scene.add(qLabel);
+
+// simulation
+const stages=[
+ {name:'Calor sensible',title:'1. Calentamiento del hielo',desc:'El hielo absorbe calor y su temperatura aumenta hasta 0 °C. No cambia de estado.',formula:'Q = mcΔT',type:'sensible',state:'Sólido',t0:-20,t1:0,a:0,b:.20},
+ {name:'Calor latente',title:'2. Fusión',desc:'A 0 °C y presión normal, el hielo se funde y se transforma en agua. La temperatura permanece constante.',formula:'Q = mL<sub>f</sub>',type:'latente',state:'Sólido + líquido',t0:0,t1:0,a:.20,b:.35},
+ {name:'Calor sensible',title:'3. Calentamiento del agua',desc:'El agua líquida absorbe calor y su temperatura aumenta de 0 °C a 100 °C.',formula:'Q = mcΔT',type:'sensible',state:'Líquido',t0:0,t1:100,a:.35,b:.65},
+ {name:'Calor latente',title:'4. Vaporización',desc:'A 100 °C y presión normal, el agua cambia de líquido a vapor. La temperatura se mantiene constante.',formula:'Q = mL<sub>v</sub>',type:'latente',state:'Líquido + vapor',t0:100,t1:100,a:.65,b:.82},
+ {name:'Calor sensible',title:'5. Calentamiento del vapor',desc:'El vapor puede seguir absorbiendo calor y aumentar su temperatura.',formula:'Q = mcΔT',type:'sensible',state:'Vapor',t0:100,t1:120,a:.82,b:1}
+];
+let u=0,playing=true,speed=1,last=performance.now(); const duration=24;
+const $=id=>document.getElementById(id);
+const playBtn=$('playBtn');
+const segEls=document.querySelectorAll('.seg');
+const ui={badge:$('stageBadge'),eq:$('equation'),phase:$('phaseTxt'),temp:$('tempTxt'),state:$('stateTxt'),title:$('stageTitle'),desc:$('stageDesc'),formula:$('formulaTxt'),mercury:$('mercury'),scrub:$('scrub'),time:$('timeTxt')};
+function stageAt(x){return stages.find((s,i)=>x>=s.a && (x<s.b || i===stages.length-1))||stages[4]}
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+// All positions are derived from the timeline. Scrubbing, pausing and
+// restarting never accumulate drift or teleport particles across stages.
+function smoothstep(v){v=clamp(v,0,1);return v*v*(3-2*v)}
+const liquidColor=new THREE.Color(0x4aa8ff), solidColor=new THREE.Color(0xbfe4ff), gasColor=new THREE.Color(0xdcefff);
+function liquidPosition(i,t,height){
+  const r=.12+.72*Math.sqrt((((i*37)%N)+.5)/N);
+  const a=i*2.399963+.055*Math.sin(t*.9+i);
+  const y=.13+Math.max(0,height-.20)*(.13+.78*((i*23)%N)/N)+.018*Math.sin(t*2.4+i);
+  return new THREE.Vector3(r*Math.cos(a),clamp(y,.11,Math.max(.15,height)),r*Math.sin(a));
+}
+function gasPosition(i,t,age){
+  const a=i*2.399963+.12*Math.sin(t*.5+i);
+  const r=.23+.40*((i*13)%N)/N+.17*age;
+  return new THREE.Vector3(r*Math.cos(a),2.38+1.45*age+.09*Math.sin(t*2+i),r*Math.sin(a));
+}
+function updateParticles(stage,local,t){
+  const idx=stages.indexOf(stage);
+  const fusion=idx===1 ? local : (idx>1 ? 1 : 0);
+  const evaporation=idx===3 ? local : (idx>3 ? 1 : 0);
+  const height=1.72*smoothstep(fusion)*(1-smoothstep(evaporation));
+  liquid.visible=height>.024;
+  surface.visible=liquid.visible;
+  liquid.scale.y=Math.max(.001,height/1.85);
+  liquid.position.y=.08+height/2;
+  surface.position.y=.08+height;
+  surface.scale.setScalar(1+.009*Math.sin(t*2));
+
+  const iceFraction=1-smoothstep(fusion);
+  iceCubes.visible=iceFraction>.009;
+  iceCubes.scale.setScalar(Math.max(.001,iceFraction));
+  iceCubes.position.y=-.10*(1-iceFraction);
+
+  vaporGroup.visible=evaporation>.01;
+  vaporMat.opacity=.07+.62*smoothstep(evaporation);
+
+  particles.forEach((p,i)=>{
+    const base=p.userData.solid;
+    const solidVibration=.005+(idx===0?.017*local:.017);
+    const solidPos=new THREE.Vector3(
+      base.x+solidVibration*Math.sin(t*4+i),
+      base.y+solidVibration*.35*Math.sin(t*5+i*.7),
+      base.z+solidVibration*Math.cos(t*4.3+i)
+    );
+    const melted=idx===0 ? 0 : (idx===1 ? smoothstep((local-i/N*.92)*12) : 1);
+    const fluidPos=liquidPosition(i,t,Math.max(.14,height));
+    const pos=solidPos.lerp(fluidPos,melted);
+    const gasAge=clamp((evaporation-i/N*.96)*2,0,1.25);
+    const gasBlend=idx<3 ? 0 : smoothstep((evaporation-i/N*.96)*10);
+    pos.lerp(gasPosition(i,t,gasAge),gasBlend);
+    p.position.copy(pos);
+    p.material.color.copy(solidColor).lerp(liquidColor,melted).lerp(gasColor,gasBlend);
+    p.visible=true;
+  });
+  // White droplets are a symbolic visualization; pure water vapor is invisible.
+  vaporGroup.children.forEach((p,i)=>{
+    const d=p.userData;
+    p.position.set(Math.cos(d.a+t*d.s*.25)*d.r,d.y+Math.sin(t*d.s+i)*.08,Math.sin(d.a+t*d.s*.25)*d.r);
+  });
+}
+
+function updateScene(){
+  const st=stageAt(u), local=clamp((u-st.a)/(st.b-st.a),0,1), temp=lerp(st.t0,st.t1,local);
+  ui.badge.textContent=st.name; ui.badge.className=st.type; ui.eq.innerHTML=st.formula; ui.phase.textContent=st.title.replace(/^\d+\.\s*/, '');
+  ui.temp.textContent=Math.round(temp); ui.state.textContent=st.state; ui.title.textContent=st.title; ui.desc.textContent=st.desc; ui.formula.innerHTML=st.formula;
+  segEls.forEach((e,i)=>e.classList.toggle('active',i===stages.indexOf(st)));
+  ui.mercury.style.height=(clamp((temp+20)/140,0,1)*100)+'%'; ui.scrub.value=Math.round(u*1000); ui.time.textContent=(u*duration).toFixed(1)+' s';
+  const t=u*duration; updateParticles(st,local,t);
+  flame.scale.y=.9+.12*Math.sin(t*8); flame.material.opacity=.75+.15*Math.sin(t*6);
+  arrows.forEach((a,i)=>{a.position.y=((t*.65+a.userData.phase)%1)*.55; a.material.opacity=.28+.45*(1-((t*.65+a.userData.phase)%1));});
+  drawCurve(u);
+}
+
+// heating curve
+const curveCanvas=document.getElementById('curve'); const ctx=curveCanvas.getContext('2d');
+function resizeCurve(){const r=curveCanvas.getBoundingClientRect();curveCanvas.width=Math.max(300,Math.floor(r.width*devicePixelRatio));curveCanvas.height=Math.max(250,Math.floor(r.height*devicePixelRatio));ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}
+function drawCurve(progress){
+  const w=curveCanvas.clientWidth,h=curveCanvas.clientHeight;ctx.clearRect(0,0,w,h);ctx.save();ctx.translate(42,20);const W=w-58,H=h-55;
+  ctx.strokeStyle='#aebccb';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,H);ctx.lineTo(W,H);ctx.moveTo(0,0);ctx.lineTo(0,H);ctx.stroke();
+  ctx.fillStyle='#50657a';ctx.font='12px Segoe UI';ctx.fillText('Temperatura',-35,-3);ctx.fillText('Calor suministrado Q (no a escala)',W-190,H+28);
+  const pts=[{x:0,y:-20},{x:.20,y:0},{x:.35,y:0},{x:.65,y:100},{x:.82,y:100},{x:1,y:120}];
+  const yMap=T=>H-(T+20)/140*H; const xMap=x=>x*W;
+  for(let i=0;i<pts.length-1;i++){
+    const isLat=(i===1||i===3);ctx.strokeStyle=isLat?'#f28c28':'#1769d2';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(xMap(pts[i].x),yMap(pts[i].y));ctx.lineTo(xMap(pts[i+1].x),yMap(pts[i+1].y));ctx.stroke();
+  }
+  // 0 and 100 guides
+  ctx.setLineDash([5,5]);ctx.strokeStyle='#c7d1dc';ctx.lineWidth=1;[0,100].forEach(T=>{ctx.beginPath();ctx.moveTo(0,yMap(T));ctx.lineTo(W,yMap(T));ctx.stroke();ctx.fillStyle='#60758a';ctx.fillText(T+'°C',4,yMap(T)-5)});ctx.setLineDash([]);
+  // playhead
+  const s=stageAt(progress),local=(progress-s.a)/(s.b-s.a),T=lerp(s.t0,s.t1,local);const x=xMap(progress),y=yMap(T);ctx.fillStyle=s.type==='latente'?'#f28c28':'#1769d2';ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();ctx.restore();
+}
+
+function resize(){const r=wrap.getBoundingClientRect();renderer.setSize(r.width,r.height,false);camera.aspect=r.width/r.height;camera.updateProjectionMatrix();resizeCurve();drawCurve(u)}
+addEventListener('resize',resize);resize();
+
+document.getElementById('playBtn').onclick=()=>{if(!playing && u>=1)u=0;playing=!playing;playBtn.textContent=playing?'Pausa':'Reproducir';updateScene()};
+document.getElementById('restartBtn').onclick=()=>{u=0;playing=true;playBtn.textContent='Pausa';updateScene()};
+document.getElementById('speed').onchange=e=>speed=parseFloat(e.target.value);
+document.getElementById('scrub').oninput=e=>{u=parseFloat(e.target.value)/1000;playing=false;playBtn.textContent='Reproducir';updateScene()};
+
+function animate(now){requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.1);last=now;if(playing){u=Math.min(1,u+dt/duration*speed);if(u>=1){playing=false;playBtn.textContent='Reproducir';}}updateScene();renderer.render(scene,camera)}
+requestAnimationFrame(animate);
+window.__sceneOK=true;
+
+</script>
+<script>setTimeout(()=>{if(!window.__sceneOK){const m=document.createElement('div');m.textContent='No se pudo iniciar la escena 3D. Revisa tu conexión o que el navegador tenga WebGL activado.';m.style.cssText='position:absolute;left:14px;right:14px;bottom:14px;background:#fff4e8;color:#8a3b00;padding:10px;border-radius:12px;font-weight:700;z-index:5';document.getElementById('sceneWrap').appendChild(m);}},5000);</script>
+</body>
+</html>
